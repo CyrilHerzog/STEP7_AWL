@@ -1,0 +1,91 @@
+TYPE "AO4-20_TYPE"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : AO_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   stInput : STRUCT 	//Eingänge
+    iVal : INT ;	
+   END_STRUCT ;	
+   stOutput : STRUCT 	//Ausgänge
+    wPeri : WORD ;	
+   END_STRUCT ;	
+   stSim : STRUCT 	//Simulation
+    bEn : BOOL ;	//Simulation Ein / Aus
+    iVal : INT ;	//Simulationswert
+   END_STRUCT ;	
+   stScale : STRUCT 	//Skalierung 
+    iHigh : INT  := 10000;	//Max Wert Ausgang
+    iLow : INT ;	//Min Wert Ausgang
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "AO4-20" : VOID
+TITLE =AO4-20
+//Dieser Baustein kann auch für eine Ausgabe von 0 - 20mA verwendet werden
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : 'AO4-20'
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  AO_TYPE : "AO4-20_TYPE";	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      SET   ; 
+      L     P##AO_TYPE; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     LW     0; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [LW 0]; 
+// Eingangswert
+      L     DBW [AR1,P#0.0]; 
+// Simulation Ein / Aus
+      U     DBX [AR1,P#4.0]; 
+      SPBN  j001; 
+// Simulationswert
+      L     DBW [AR1,P#6.0]; 
+j001: T     LW     0; 
+// Skalierung Maximum
+      L     DBW [AR1,P#8.0]; 
+      T     LW     2; 
+// Skalierung Minimum
+      L     DBW [AR1,P#10.0]; 
+      T     LW     4; 
+      -I    ; 
+      T     LW     6; 
+      L     LW     0; 
+      L     LW     2; 
+      <I    ; 
+      SPB   j002; 
+      T     LW     0; 
+j002: TAK   ; 
+      L     LW     4; 
+      >I    ; 
+      SPB   j003; 
+      T     LW     0; 
+j003: L     LW     0; 
+// Simulationswert
+      T     DBW [AR1,P#6.0]; 
+      L     LW     4; 
+      +I    ; 
+      L     27648; 
+      *D    ; 
+      L     LW     6; 
+      /D    ; 
+// Ausgangswert Peripherie
+      T     DBW [AR1,P#2.0]; 
+      BE    ; 
+
+
+END_FUNCTION
+

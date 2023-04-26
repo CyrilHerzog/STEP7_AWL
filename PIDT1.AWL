@@ -1,0 +1,336 @@
+TYPE "PIDT1_TYPE"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : PID_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   stInput : STRUCT 	//Eingänge
+    bReset : BOOL ;	//Zurücksetzen
+    bMan : BOOL ;	//Hand Ein / Aus
+    iActVal : INT ;	//Istwert
+    iSetVal : INT ;	//Sollwert
+    iManVal : INT ;	//Handwert
+   END_STRUCT ;	
+   stOutput : STRUCT 	//Ausgänge
+    bHiLim : BOOL ;	//Anti-Windup Hoch aktiv
+    bLoLim : BOOL ;	//Anti-Windup Tief aktiv
+    iY : INT ;	//Stellwert Integerform
+    rYP : REAL ;	//Verstärkungsanteil 
+    rYI : REAL ;	//Integralanteil
+    rYD : REAL ;	//Differentialanteil
+    iError : INT ;	//Regelabweichung
+   END_STRUCT ;	
+   stParam : STRUCT 	//Parameter
+    iDeathband : INT ;	//Totband
+    iLimLo : INT ;	//Begrenzung Min
+    iLimHi : INT ;	//Begrenzung Max
+    iValPreCntrl : INT ;	//Vorsteuerung / Störgrössenaufschaltung
+    rKp : REAL ;	//Verstärkungsfaktor
+    tTn : TIME ;	//Nachstellzeit
+    tTv : TIME ;	//Vorhaltezeit
+    tTvz : TIME ;	//Zeitkonstante D-Anteil
+    tTaskTime : TIME ;	//Zykluszeit
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "PIDT1" : VOID
+TITLE =PIDT1
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : PIDT1
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  PIDT1_TYPE : "PIDT1_TYPE";	
+END_VAR
+VAR_TEMP
+  bEnI : BOOL ;	
+  bEnD : BOOL ;	
+  bErrPos : BOOL ;	
+  bErrNeg : BOOL ;	
+  iTemp : INT ;	
+  iErrorPre : INT ;	
+  diTemp : DINT ;	
+  rTemp : REAL ;	
+  iError : INT ;	
+  rTaskTime : REAL ;	
+  rTn : REAL ;	
+  rTvz : REAL ;	
+  rKp : REAL ;	
+  rYp : REAL ;	
+  rI : REAL ;	
+  rD : REAL ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =Reset / Manuel Mode / Parameter DB
+
+
+      SET   ; 
+      L     P##PIDT1_TYPE; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #iTemp; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#iTemp]; 
+// bReset
+      U     DBX [AR1,P#0.0]; 
+      O     "RunUp"; 
+      SPBN  j001; 
+      L     0; 
+// iY
+      T     DBW [AR1,P#10.0]; 
+// iError
+      T     DBW [AR1,P#24.0]; 
+      L     0.000000e+000; 
+// rYI
+      T     DBD [AR1,P#16.0]; 
+// rYD
+      T     DBD [AR1,P#20.0]; 
+      SET   ; 
+// bHiLim
+      R     DBX [AR1,P#8.0]; 
+// bLoLim
+      R     DBX [AR1,P#8.1]; 
+      BEA   ; 
+
+// iError
+j001: L     DBW [AR1,P#24.0]; 
+      T     #iErrorPre; 
+// tTn
+      L     DBD [AR1,P#38.0]; 
+// tTaskTime
+      L     DBD [AR1,P#50.0]; 
+      SLD   1; 
+      >=D   ; 
+      =     #bEnI; 
+      TAK   ; 
+      DTR   ; 
+      T     #rTn; 
+      TAK   ; 
+// rTvz
+      L     DBD [AR1,P#46.0]; 
+      <=D   ; 
+      =     #bEnD; 
+      DTR   ; 
+      T     #rTvz; 
+      TAK   ; 
+      SRD   1; 
+      DTR   ; 
+      T     #rTaskTime; 
+
+
+NETWORK
+TITLE =Regelabweichung bestimmen
+
+// iDeathband
+      L     DBW [AR1,P#26.0]; 
+      T     #iTemp; 
+// iSetVal
+      L     DBW [AR1,P#4.0]; 
+// iActVal
+      L     DBW [AR1,P#2.0]; 
+      -I    ; 
+      T     #iError; 
+      NEGI  ; 
+      SPPZ  j010; 
+      NEGI  ; 
+j010: L     #iTemp; 
+      <=I   ; 
+      SPBN  j011; 
+      L     0; 
+      T     #iError; 
+j011: L     #iError; 
+      L     0; 
+      >I    ; 
+      =     #bErrPos; 
+      SPBN  j012; 
+      L     #iError; 
+      L     #iTemp; 
+      -I    ; 
+      SPA   j013; 
+j012: <I    ; 
+      =     #bErrNeg; 
+      SPBN  j013; 
+      L     #iError; 
+      L     #iTemp; 
+      +I    ; 
+j013: T     #iError; 
+
+
+NETWORK
+TITLE =P - Anteil berechnen
+
+      L     0.000000e+000; 
+// rKp
+      L     DBD [AR1,P#34.0]; 
+      <>R   ; 
+      SPB   j020; 
+      L     1.000000e+000; 
+      T     #rKp; 
+      L     0.000000e+000; 
+      SPA   j021; 
+j020: T     #rKp; 
+      L     #iError; 
+      ITD   ; 
+      DTR   ; 
+      *R    ; 
+j021: T     #rYp; 
+//rYP
+      T     DBD [AR1,P#12.0]; 
+
+
+NETWORK
+TITLE =I - Anteil berechnen (Trapezintegration)
+
+      U     #bEnI; 
+      SPBN  j030; 
+      L     #rKp; 
+      L     #rTn; 
+      /R    ; 
+      T     #rTemp; 
+      L     #iError; 
+      L     #iErrorPre; 
+      +I    ; 
+      ITD   ; 
+      DTR   ; 
+      L     #rTaskTime; 
+      *R    ; 
+      L     5.000000e-001; 
+      *R    ; 
+      L     #rTemp; 
+      *R    ; 
+      T     #rI; 
+      SPA   j031; 
+j030: L     0.000000e+000; 
+      T     #rI; 
+// rYI
+      T     DBD [AR1,P#16.0]; 
+// bLimHi
+j031: U     DBX [AR1,P#8.0]; 
+      U     #bErrPos; 
+      SPB   j032; 
+// bLimLo
+      U     DBX [AR1,P#8.1]; 
+      U     #bErrNeg; 
+      SPB   j032; 
+      L     #rI; 
+// rYI
+      L     DBD [AR1,P#16.0]; 
+      +R    ; 
+      SPA   j033; 
+// rYI
+j032: L     DBD [AR1,P#16.0]; 
+j033: T     DBD [AR1,P#16.0]; 
+
+
+NETWORK
+TITLE =DT1 - Anteil berechnen
+
+      U     #bEnD; 
+      SPBN  j040; 
+      L     #iError; 
+      L     #iErrorPre; 
+      -I    ; 
+      ITD   ; 
+      DTR   ; 
+      L     #rKp; 
+      *R    ; 
+// rTv
+      L     DBD [AR1,P#42.0]; 
+      DTR   ; 
+      *R    ; 
+      T     #rD; 
+// rYD
+      L     DBD [AR1,P#20.0]; 
+      NEGR  ; 
+      L     #rTaskTime; 
+      *R    ; 
+      L     #rD; 
+      +R    ; 
+      L     #rTvz; 
+      /R    ; 
+// rYD
+      L     DBD [AR1,P#20.0]; 
+      +R    ; 
+// rYD
+      T     DBD [AR1,P#20.0]; 
+      SPA   j050; 
+j040: L     0.000000e+000; 
+      T     #rD; 
+// rYD
+      T     DBD [AR1,P#20.0]; 
+
+
+NETWORK
+TITLE =Komponenten Addieren / Vorsteuerung / Handbetrieb
+
+// bMan
+j050: U     DBX [AR1,P#0.1]; 
+      SPBN  j051; 
+// iManVal
+      L     DBW [AR1,P#6.0]; 
+      ITD   ; 
+      SPA   j052; 
+j051: L     #rYp; 
+// rYI
+      L     DBD [AR1,P#16.0]; 
+      +R    ; 
+// rYD
+      L     DBD [AR1,P#20.0]; 
+      +R    ; 
+      RND   ; 
+// iValPreCntrl
+      L     DBW [AR1,P#32.0]; 
+      ITD   ; 
+      +D    ; 
+j052: T     #diTemp; 
+
+
+NETWORK
+TITLE =Begrenzung / Anti Windup Massnahme
+
+      L     #diTemp; 
+// iLimHi
+      L     DBW [AR1,P#30.0]; 
+      ITD   ; 
+      >D    ; 
+      SPBN  j060; 
+// bHiLim
+      S     DBX [AR1,P#8.0]; 
+      T     #diTemp; 
+      SPA   j062; 
+j060: TAK   ; 
+// iLimLo
+      L     DBW [AR1,P#28.0]; 
+      ITD   ; 
+      <D    ; 
+      SPBN  j061; 
+// bLoLim
+      S     DBX [AR1,P#8.1]; 
+      T     #diTemp; 
+      SPA   j062; 
+// bHiLim
+j061: R     DBX [AR1,P#8.0]; 
+// bLoLim
+      R     DBX [AR1,P#8.1]; 
+j062: L     #diTemp; 
+// iY
+      T     DBW [AR1,P#10.0]; 
+
+
+NETWORK
+TITLE =Regelabweichung sichern
+
+      L     #iError; 
+// iError
+      T     DBW [AR1,P#24.0]; 
+      BE    ; 
+
+END_FUNCTION
+

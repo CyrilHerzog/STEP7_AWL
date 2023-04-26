@@ -1,0 +1,104 @@
+TYPE "DEBOUNCE_TYPE"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : DEB_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   bIn : BOOL ;	//Eingang 
+   bOut : BOOL ;	//Ausgang
+   tTime : TIME ;	//Entprellzeit
+   stPrivate : STRUCT 	//Private Variablen (Instanz)
+    bInFp : BOOL ;	
+    bInFn : BOOL ;	
+    bTon : BOOL ;	
+    bTof : BOOL ;	
+    diTicksPre : DINT ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "DEBOUNCE" : VOID
+TITLE =DEBOUNCE
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : DEBOUNCE
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  DEBOUNCE_TYPE : "DEBOUNCE_TYPE";	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      SET   ; 
+// Datenbaustein öffnen
+      L     P##DEBOUNCE_TYPE; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     LW     0; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [LW 0]; 
+// bIn
+      U     DBX [AR1,P#0.0]; 
+      =     L      0.0; 
+// bInFp
+      FP    DBX [AR1,P#6.0]; 
+      =     L      0.1; 
+      U     L      0.0; 
+// bInFn
+      FN    DBX [AR1,P#6.1]; 
+      O     L      0.1; 
+      SPBN  j001; 
+      L     "SysTick"; 
+// diTicksPre
+      T     DBD [AR1,P#8.0]; 
+
+// Timer 1 - Einschaltverzögerung
+j001: U     L      0.0; 
+// bTon
+      UN    DBX [AR1,P#6.2]; 
+      SPBN  j002; 
+      L     "SysTick"; 
+// diTicksPre
+      L     DBD [AR1,P#8.0]; 
+      -D    ; 
+// tTime
+      L     DBD [AR1,P#2.0]; 
+      >=D   ; 
+// bTon
+      S     DBX [AR1,P#6.2]; 
+// bOut
+      S     DBX [AR1,P#0.1]; 
+j002: UN    L      0.0; 
+// bTon
+      R     DBX [AR1,P#6.2]; 
+
+// Timer 2 - Aussschaltverzögerung
+// bTon
+      UN    DBX [AR1,P#6.2]; 
+// bTof
+      UN    DBX [AR1,P#6.3]; 
+      SPBN  j003; 
+      L     "SysTick"; 
+// diTicksPre
+      L     DBD [AR1,P#8.0]; 
+      -D    ; 
+// tTime
+      L     DBD [AR1,P#2.0]; 
+      >=D   ; 
+// bTof
+      S     DBX [AR1,P#6.3]; 
+// bOut
+      R     DBX [AR1,P#0.1]; 
+j003: U     L      0.0; 
+// bTof
+      R     DBX [AR1,P#6.3]; 
+      BE    ; 
+
+END_FUNCTION
+

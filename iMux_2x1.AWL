@@ -1,0 +1,28 @@
+FUNCTION "iMUX_2x1" : INT
+TITLE =iMUX_2x1
+//Multiplexer für zwei Eingangswerte vom Typ Integer
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : iMUX_2x1
+VERSION : 0.1
+
+
+VAR_INPUT
+  iIn1 : INT ;	
+  iIn2 : INT ;	
+  bSel : BOOL ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      SET   ; 
+      L     #iIn1; 
+      UN    #bSel; 
+      SPB   j001; 
+      L     #iIn2; 
+j001: T     #RET_VAL; 
+      CLR   ; 
+      BE    ; 
+END_FUNCTION
+

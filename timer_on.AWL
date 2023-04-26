@@ -1,0 +1,77 @@
+TYPE "TIMER_TYPE"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : TMR_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   bIn : BOOL ;	//Eingang
+   bOut : BOOL ;	//Ausgang
+   tTime : TIME ;	//Zeitparameter
+   tPastTime : TIME ;	//Vergangene Zeit
+   stPrivate : STRUCT 	//Private Variablen (Instanz)
+    bInFlag : BOOL ;	
+    bTimer : BOOL ;	
+    diTicksPre : DINT ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "TIMER_ON" : VOID
+TITLE =TIMER_ON
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : TMR_ON
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  TIMER_TYPE : "TIMER_TYPE";	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      SET   ; 
+      L     P##TIMER_TYPE; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     LW     0; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [LW 0]; 
+// bIn
+      U     DBX [AR1,P#0.0]; 
+      =     L      0.0; 
+// bInFlag
+      FP    DBX [AR1,P#10.0]; 
+      SPBN  j001; 
+      L     "SysTick"; 
+// diTicksPre
+      T     DBD [AR1,P#12.0]; 
+j001: U     L      0.0; 
+// bTimer
+      UN    DBX [AR1,P#10.1]; 
+      SPBN  j002; 
+      L     "SysTick"; 
+// diTicksPre
+      L     DBD [AR1,P#12.0]; 
+      -D    ; 
+// diTimePast
+      T     DBD [AR1,P#6.0]; 
+// tTime
+      L     DBD [AR1,P#2.0]; 
+      >=D   ; 
+// bTimer
+      S     DBX [AR1,P#10.1]; 
+j002: UN    L      0.0; 
+// bTimer
+      R     DBX [AR1,P#10.1]; 
+      U     DBX [AR1,P#10.1]; 
+// bOut
+      =     DBX [AR1,P#0.1]; 
+      BE    ; 
+
+END_FUNCTION
+

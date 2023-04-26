@@ -1,0 +1,220 @@
+TYPE "SYS_TYPE"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : SYS_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   stInput : STRUCT 	//Eingänge
+    bRes : BOOL ;	//Reserve
+   END_STRUCT ;	
+   stOutput : STRUCT 	//Ausgänge
+    bWDT : BOOL ;	//WatchDog 2s Pulse
+    bBatFlt : BOOL ;	//Batteriefehler SPS
+   END_STRUCT ;	
+   stParam : STRUCT 	//Parameter
+    tStartUp : TIME ;	//Anlaufzeit "RunUp-Merker" = True
+   END_STRUCT ;	
+   stPrivate : STRUCT 	
+    diTicksPre : DINT ;	
+    diSysTick : DINT ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "SYSTEM" : VOID
+TITLE =SYSTEM
+//Bildet Werte für folgene Variablen:
+//- SysTick                     => Merker muss in Symboltabelle definiert werden!
+//- RunUp                       => Merker muss in Symboltabelle definiert werden!
+//- True                        => Merker muss in Symboltabelle definiert werden!
+//- False                       => Merker muss in Symboltabelle definiert werden!
+//- WatchDog (2s Pulse)
+//- Batteriefehler SPS
+//
+//Bausteine der Bibliothek BIS_BA nutzen intern die Variablen RunUp und SysTick!
+//Baustein muss in OB1, OB35, OB81 und OB100 eingebaut werden!
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : SYSTEM
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  SYS_TYPE : "SYS_TYPE";	
+END_VAR
+VAR_TEMP
+  stTopSI : STRUCT 	
+   byEvClass : BYTE ;	
+   byEvNum : BYTE ;	
+   byPrio : BYTE ;	
+   byNum : BYTE ;	
+   byTyp_23 : BYTE ;	
+   byTyp_1 : BYTE ;	
+   wZI_1 : WORD ;	
+   dwZI_23 : DWORD ;	
+  END_STRUCT ;	
+  stStartUpSi : STRUCT 	
+   byEvClass : BYTE ;	
+   byEvNum : BYTE ;	
+   byPrio : BYTE ;	
+   byNum : BYTE ;	
+   byTyp_23 : BYTE ;	
+   byTyp_1 : BYTE ;	
+   wZI_1 : WORD ;	
+   dwZI_23 : DWORD ;	
+  END_STRUCT ;	
+  iTemp : INT ;	
+  wTemp : WORD ;	
+  dwTemp : DWORD ;	
+  bTemp : BOOL ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =Konstante "True" und "False"
+
+      SET   ; 
+      S     "True"; 
+      R     "False"; 
+
+
+NETWORK
+TITLE =Systeminformationen lesen => Welcher OB ist aktiv
+
+      CALL "RD_SINFO" (
+           RET_VAL                  := #iTemp,
+           TOP_SI                   := #stTopSI,
+           START_UP_SI              := #stStartUpSi);
+
+
+NETWORK
+TITLE =Datenbaustein indirekt öffnen
+
+      L     P##SYS_TYPE; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #wTemp; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#wTemp]; 
+
+
+
+NETWORK
+TITLE =Programm für den aktuellen OB selektieren
+
+      L     1; 
+      L     #stTopSI.byNum; 
+      ==I   ; 
+      SPB   j001; 
+      L     35; 
+      ==I   ; 
+      SPB   j035; 
+      TAK   ; 
+      L     81; 
+      ==I   ; 
+      SPB   j081; 
+      TAK   ; 
+      L     100; 
+      ==I   ; 
+      SPB   j100; 
+      BEA   ; 
+
+
+
+NETWORK
+TITLE =OB1
+
+// SysTick  
+j001: L     DBD [AR1,P#12.0]; 
+      T     "SysTick"; 
+
+      UN    "RunUp"; 
+      SPB   j002; 
+      L     "SysTick"; 
+// RunUpTime
+      L     DBD [AR1,P#4.0]; 
+      >=D   ; 
+      R     "RunUp"; 
+
+// Watchdog bilden
+j002: U     DBX [AR1,P#2.0]; 
+      =     #bTemp; 
+      L     "SysTick"; 
+// SysTickPre
+      L     DBD [AR1,P#8.0]; 
+      -D    ; 
+      L     T#2S; 
+      >=D   ; 
+      SPBN  j003; 
+      L     "SysTick"; 
+// SysTickPre
+      T     DBD [AR1,P#8.0]; 
+      UN    #bTemp; 
+      =     #bTemp; 
+j003: U     #bTemp; 
+// WatchDog
+      =     DBX [AR1,P#2.0]; 
+      BEA   ; 
+
+
+NETWORK
+TITLE =OB 35 - SysTick bilden 
+
+// OB35 - CycleTime => Byte 10 + 11
+j035: L     #stTopSI.dwZI_23; 
+      L     DW#16#FFFF; 
+      UD    ; 
+      ITD   ; 
+// SysTick
+      L     DBD [AR1,P#12.0]; 
+      +D    ; 
+      T     DBD [AR1,P#12.0]; 
+      BEA   ; 
+
+NETWORK
+TITLE =OB 81 - Batteriefehler
+
+// AR2 sichern
+j081: TAR2  #dwTemp; 
+// Kommende Fehler
+      L     P##stTopSI; 
+      LAR2  ; 
+      L     W#16#3921; 
+      L     LW [AR2,P#0.0]; 
+      ==I   ; 
+      =     #bTemp; 
+      L     W#16#3922; 
+      ==I   ; 
+      O     #bTemp; 
+// Batteriefehler
+      S     DBX [AR1,P#2.1]; 
+// Gehende Fehler
+      TAK   ; 
+      L     W#16#3821; 
+      ==I   ; 
+      =     #bTemp; 
+      TAK   ; 
+      L     W#16#3822; 
+      ==I   ; 
+      O     #bTemp; 
+// Batteriefehler
+      R     DBX [AR1,P#2.1]; 
+// AR2 wiederherstellen
+      LAR2  #dwTemp; 
+      BEA   ; 
+
+NETWORK
+TITLE =OB 100 - Restart 
+
+j100: SET   ; 
+      S     "RunUp"; 
+
+// Reset Systemzähler (SysTick)
+      L     L#0; 
+      T     DBD [AR1,P#12.0]; 
+      BE    ; 
+
+END_FUNCTION
+

@@ -1,0 +1,107 @@
+TYPE "PT1_TYPE"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : PT1_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   stInput : STRUCT 	//Eingänge
+    bReset : BOOL ;	//Zurücksetzen
+    iX : INT ;	//Eingangswert
+   END_STRUCT ;	
+   stOutput : STRUCT 	//Ausgänge
+    iY : INT ;	//Ausgangswert Integerform
+    rY : REAL ;	//Ausgangswert Gleitpunktform
+   END_STRUCT ;	
+   stParam : STRUCT 	//Parameter
+    rKp : REAL ;	//Verstärkungsfaktor
+    tT1 : TIME ;	//Zeitkonstante
+    tTaskTime : TIME ;	//Zykluszeit
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "PT1" : VOID
+TITLE =PT1
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : PT1
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  PT1_TYPE : "PT1_TYPE";	
+END_VAR
+VAR_TEMP
+  iTemp : INT ;	
+  rTemp : REAL ;	
+  rY : REAL ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      SET   ; 
+      L     P##PT1_TYPE; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #iTemp; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#iTemp]; 
+// Reset
+      U     DBX [AR1,P#0.0]; 
+      O     "RunUp"; 
+      SPBN  j001; 
+      L     0.000000e+000; 
+// rY
+      T     DBD [AR1,P#6.0]; 
+      L     0; 
+// iY
+      T     DBW [AR1,P#4.0]; 
+      BEA   ; 
+j001: L     L#0; 
+// tT1
+      L     DBD [AR1,P#14.0]; 
+      <D    ; 
+      SPB   j002; 
+// iX
+      L     DBW [AR1,P#2.0]; 
+// iY
+      T     DBW [AR1,P#4.0]; 
+      ITD   ; 
+      DTR   ; 
+// rY
+      T     DBW [AR1,P#6.0]; 
+      BEA   ; 
+j002: DTR   ; 
+      T     #rTemp; 
+// iX
+      L     DBW [AR1,P#2.0]; 
+      ITD   ; 
+      DTR   ; 
+// rKp
+      L     DBD [AR1,P#10.0]; 
+      *R    ; 
+// rY
+      L     DBD [AR1,P#6.0]; 
+      T     #rY; 
+      -R    ; 
+// tTaskTime
+      L     DBD [AR1,P#18.0]; 
+      DTR   ; 
+      *R    ; 
+      L     #rTemp; 
+      /R    ; 
+      L     #rY; 
+      +R    ; 
+// rY
+      T     DBD [AR1,P#6.0]; 
+      RND   ; 
+// iY
+      T     DBW [AR1,P#4.0]; 
+      BE    ; 
+
+END_FUNCTION
+

@@ -1,0 +1,358 @@
+TYPE "MOT_TYPE"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : MOT_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   stInput : STRUCT 	//Eingänge
+    bRestart : BOOL ;	//Zurücksetzen
+    bMan : BOOL ;	//Betriebsart "Hand" einschalten
+    bAut : BOOL ;	//Betriebsart "Automatik" einschalten
+    bMCS : BOOL ;	//Motorschutzschalter
+    bFB : BOOL ;	//Rückmeldung Schütz, FU
+    bReserve_0 : BOOL ;	//Reserve
+    bExtFlt : BOOL ;	//Externer Fehler
+    bLock : BOOL ;	//Verriegelung aktiv
+    bAutStart : BOOL ;	//Starten im Modus "Automatik" / Starten und Stoppen bei Schalterkonfiguration 
+    bAutStop : BOOL ;	//Stoppen im Modus "Automatik"
+    bManStart : BOOL ;	//Starten im Modus "Hand" / Starten und Stoppen bei Schalterkonfiguration
+    bManStop : BOOL ;	//Stoppen im Modus "Hand"
+    bAck : BOOL ;	//Quittieren
+    bReserve_1 : BOOL ;	//Reserve
+    bReserve_2 : BOOL ;	//Reserve
+    bReserve_3 : BOOL ;	//Reserve
+   END_STRUCT ;	
+   stOutput : STRUCT 	//Ausgänge
+    bMan : BOOL ;	//Betriebsart "Hand" aktiv
+    bAut : BOOL ;	//Betriebsart "Automatik" aktiv
+    bStart : BOOL ;	//Motor starten
+    bRun : BOOL ;	//Motor ist "Ein"
+    bStop : BOOL ;	//Motor ist "Aus"
+    bLock : BOOL ;	//Motor ist gesperrt
+    bReserve_0 : BOOL ;	//Reserve
+    bReserve_1 : BOOL ;	//Reserve
+    bFltFB : BOOL ;	//Laufzeitfehler
+    bFltMCS : BOOL ;	//Sicherungsausfall
+    bFltExtFlt : BOOL ;	//Externer Fehler aktiv
+    bReserve_2 : BOOL ;	//Reserve
+    bReserve_3 : BOOL ;	//Reserve
+    bReserve_4 : BOOL ;	//Reserve
+    bReserve_5 : BOOL ;	//Reserve
+    bFlt : BOOL ;	//Motor Sammelstörung
+   END_STRUCT ;	
+   stParam : STRUCT 	//Parameter
+    bEnMCS : BOOL ;	//Motorschutzüberwachung aktivieren
+    bEnFB : BOOL ;	//Rückmeldung aktivieren
+    bReserve : BOOL ;	
+    bAutSwMode : BOOL ;	//Schaltermodus für Automatik (Ein / Aus mit bAutStart)
+    bManSwMode : BOOL ;	//Schaltermodus für Lokaler Betrieb (Ein / Aus mit bManStart)
+    tTimeFB : TIME ;	//Zeitüberwachung Rückmeldung 
+   END_STRUCT ;	
+   stPrivate : STRUCT 	//Private Instanzdaten
+    bStart : BOOL ;	
+    bOpMode : BOOL ;	//Man = False, Aut = True
+    bFlt : BOOL ;	
+    bFbFlt : BOOL ;	
+    bManStartPre : BOOL ;	
+    bAckPre : BOOL ;	
+    bTon : BOOL ;	
+    bTonStartPre : BOOL ;	
+    bFltPre : BOOL ;	
+    diTicksPre : DINT ;	
+    tTimePast : TIME ;	//Vergangene Zeit Rückmeldung (Zur Beobachtung)
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "MOT" : VOID
+TITLE =MOT
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : MOT
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  MOT_TYPE : "MOT_TYPE";	
+END_VAR
+VAR_TEMP
+  stTempMot : "MOT_TYPE";	
+  dwTemp : DWORD ;	
+  bTonStart : BOOL ;	
+  wTemp : WORD ;	
+  bTempManStartFp : BOOL ;	
+  bTemp : BOOL ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =Umkopieren der Eingänge
+
+      SET   ; 
+
+//Adressregister 2 sichern
+      TAR2  #dwTemp; 
+
+// DB indirekt öffnen
+      L     P##MOT_TYPE; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #wTemp; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#wTemp]; 
+      L     P##stTempMot; 
+      LAR2  ; 
+// Eingänge
+      L     DBW [AR1,P#0.0]; 
+      T     LW [AR2,P#0.0]; 
+
+// Konfig - Bits
+      L     DBW [AR1,P#4.0]; 
+      T     LW [AR2,P#4.0]; 
+
+// Hilfsdaten Daten Bits
+      L     DBW [AR1,P#10.0]; 
+      T     LW [AR2,P#10.0]; 
+
+
+NETWORK
+TITLE =Neuerstart - Rücksetzen aller Statischen Variablen
+
+      U     #stTempMot.stInput.bRestart; 
+      O     "RunUp"; 
+      SPBN  j001; 
+      L     0; 
+// Ausgänge    
+      T     DBW [AR1,P#2.0]; 
+// Instanzdaten
+      T     DBW [AR1,P#10.0]; 
+      BEA   ; 
+
+NETWORK
+TITLE =Hand / Auto - Modus 
+// Wenn beide Eingänge gesetzt, dann ist der Hand - Modus aktiv
+// Setzen OpMode (Hand / Automatik - Betrieb)
+j001: U     #stTempMot.stInput.bAut; 
+      O     #stTempMot.stPrivate.bOpMode; 
+      UN    #stTempMot.stInput.bMan; 
+      =     #stTempMot.stPrivate.bOpMode; 
+
+// Verknüpfung Modus Automatik
+      U     #stTempMot.stPrivate.bOpMode; 
+      =     #stTempMot.stOutput.bAut; 
+
+// Verknüpfung Modus Manuel
+      UN    #stTempMot.stPrivate.bOpMode; 
+      =     #stTempMot.stOutput.bMan; 
+
+NETWORK
+TITLE =Motor Zustand setzen
+
+// Rückmeldung Schütz
+      U     #stTempMot.stParam.bEnFB; 
+      U     #stTempMot.stInput.bFB; 
+      O(    ; 
+      UN    #stTempMot.stParam.bEnFB; 
+      U     #stTempMot.stPrivate.bStart; 
+      )     ; 
+      =     #stTempMot.stInput.bFB; 
+
+
+//Rückmeldung Motor "Ein"
+      U     #stTempMot.stPrivate.bStart; 
+      U     #stTempMot.stInput.bFB; 
+      =     #stTempMot.stOutput.bRun; 
+
+// Rückmeldung Motor "Aus"
+      UN    #stTempMot.stPrivate.bStart; 
+      UN    #stTempMot.stInput.bFB; 
+      =     #stTempMot.stOutput.bStop; 
+
+// Sicherungsausfall
+      UN    #stTempMot.stInput.bMCS; 
+      U     #stTempMot.stParam.bEnMCS; 
+      =     #stTempMot.stOutput.bFltMCS; 
+
+// Gesperrt
+      U     #stTempMot.stInput.bLock; 
+      =     #stTempMot.stOutput.bLock; 
+
+
+// Externer Fehler
+      U     #stTempMot.stInput.bExtFlt; 
+      =     #stTempMot.stOutput.bFltExtFlt; 
+
+// Rückmeldefehler
+      U     #stTempMot.stPrivate.bFbFlt; 
+      =     #stTempMot.stOutput.bFltFB; 
+
+NETWORK
+TITLE =Fehler setzen / rücksetzen
+
+// Flankenerkennung
+      U     #stTempMot.stInput.bAck; 
+      FP    #stTempMot.stPrivate.bAckPre; 
+      =     #bTemp; 
+
+      U     #stTempMot.stInput.bManStart; 
+      FP    #stTempMot.stPrivate.bManStartPre; 
+      =     #bTempManStartFp; 
+
+
+// Fehler Rücksetzen mit Quittiertaste
+      U     #bTemp; 
+// oder im Modus "Hand" bei Schalterstellung "Aus"
+      O(    ; 
+      U     #stTempMot.stOutput.bMan; 
+      U     #stTempMot.stOutput.bStop; 
+      UN    #stTempMot.stInput.bManStart; 
+      )     ; 
+      =     #bTemp; 
+      R     #stTempMot.stPrivate.bFlt; 
+
+// Rückmeldefehler zurücksetzen
+      UN    #stTempMot.stParam.bEnFB; 
+      O     #bTemp; 
+      R     #stTempMot.stPrivate.bFbFlt; 
+
+
+// Fehler setzen
+      U     #stTempMot.stOutput.bFltExtFlt; 
+      O     #stTempMot.stPrivate.bFbFlt; 
+      O     #stTempMot.stOutput.bFltMCS; 
+      O(    ; 
+      U     #stTempMot.stOutput.bStart; 
+      U     #stTempMot.stOutput.bLock; 
+      )     ; 
+      S     #stTempMot.stPrivate.bFlt; 
+
+
+      U     #stTempMot.stPrivate.bFlt; 
+      =     #stTempMot.stOutput.bFlt; 
+
+
+NETWORK
+TITLE =Startbefehl für Motor setzen
+
+// Setzen
+      U     #stTempMot.stOutput.bAut; 
+      U     #stTempMot.stInput.bAutStart; 
+      O(    ; 
+      U     #stTempMot.stOutput.bMan; 
+      U     #bTempManStartFp; 
+      )     ; 
+      O(    ; 
+      U     #stTempMot.stOutput.bRun; 
+      U     #stTempMot.stOutput.bMan; 
+      )     ; 
+// bStart
+      S     #stTempMot.stPrivate.bStart; 
+
+// Rücksetzen
+      U     #stTempMot.stPrivate.bFlt; 
+      O     #stTempMot.stOutput.bLock; 
+      O(    ; 
+      U     #stTempMot.stOutput.bAut; 
+      U(    ; 
+      U     #stTempMot.stInput.bAutStop; 
+      UN    #stTempMot.stParam.bAutSwMode; 
+      O(    ; 
+      U     #stTempMot.stParam.bAutSwMode; 
+      UN    #stTempMot.stInput.bAutStart; 
+      )     ; 
+      )     ; 
+      )     ; 
+      O(    ; 
+      U     #stTempMot.stOutput.bMan; 
+      U(    ; 
+      U     #stTempMot.stInput.bManStop; 
+      UN    #stTempMot.stParam.bManSwMode; 
+      O(    ; 
+      U     #stTempMot.stParam.bManSwMode; 
+      UN    #stTempMot.stInput.bManStart; 
+      )     ; 
+      )     ; 
+      )     ; 
+// bStart
+      R     #stTempMot.stPrivate.bStart; 
+
+NETWORK
+TITLE =Rückmeldung (Schütz, FU) Einschalten / Ausschalten
+// Laufzeit starten
+
+      X     #stTempMot.stPrivate.bStart; 
+      X     #stTempMot.stInput.bFB; 
+      U     #stTempMot.stParam.bEnFB; 
+      =     #bTonStart; 
+
+// Laufzeitfehler bilden
+      U     #bTonStart; 
+      U     #stTempMot.stPrivate.bTon; 
+      O(    ; 
+// bRun
+      U     DBX [AR1,P#2.3]; 
+      UN    #stTempMot.stInput.bFB; 
+      )     ; 
+      O(    ; 
+// bStop
+      U     DBX [AR1,P#2.4]; 
+      U     #stTempMot.stInput.bFB; 
+      )     ; 
+      O     #stTempMot.stPrivate.bFbFlt; 
+      =     #stTempMot.stPrivate.bFbFlt; 
+
+      U     #bTonStart; 
+      UN    #stTempMot.stPrivate.bTonStartPre; 
+      SPBN  j002; 
+      L     "SysTick"; 
+// diTicksPre
+      T     DBD [AR1,P#12.0]; 
+j002: U     #bTonStart; 
+      UN    #stTempMot.stPrivate.bTon; 
+      SPBN  j003; 
+      L     "SysTick"; 
+// diTicksPre
+      L     DBD [AR1,P#12.0]; 
+      -D    ; 
+// tTimePast 
+      T     DBD [AR1,P#16.0]; 
+// tTimeFB
+      L     DBD [AR1,P#6.0]; 
+      >=D   ; 
+      S     #stTempMot.stPrivate.bTon; 
+j003: UN    #bTonStart; 
+      R     #stTempMot.stPrivate.bTon; 
+
+      U     #bTonStart; 
+      =     #stTempMot.stPrivate.bTonStartPre; 
+
+NETWORK
+TITLE =Ausgänge setzen
+
+// Motor Startbefehl 
+      U     #stTempMot.stPrivate.bStart; 
+      =     #stTempMot.stOutput.bStart; 
+
+      CLR   ; 
+      =     #stTempMot.stOutput.bReserve_0; 
+      =     #stTempMot.stOutput.bReserve_1; 
+      =     #stTempMot.stOutput.bReserve_2; 
+      =     #stTempMot.stOutput.bReserve_3; 
+      =     #stTempMot.stOutput.bReserve_4; 
+      =     #stTempMot.stOutput.bReserve_5; 
+
+// Daten auf Ausgänge übernehmen
+      L     LW [AR2,P#2.0]; 
+      T     DBW [AR1,P#2.0]; 
+
+// Hilfsdaten schreiben
+      L     LW [AR2,P#10.0]; 
+      T     DBW [AR1,P#10.0]; 
+
+// Adressregister 2 Wiederherstellen
+      LAR2  #dwTemp; 
+      BE    ; 
+END_FUNCTION
+

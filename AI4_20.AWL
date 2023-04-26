@@ -1,0 +1,106 @@
+TYPE "AI4-20_TYPE"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : AI_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   stInput : STRUCT 	//Eingänge
+    wPeri : WORD ;	//Peripheriewort
+   END_STRUCT ;	
+   stOutput : STRUCT 	//Ausgänge
+    iOut : INT ;	//Skalierter Wert
+    bFlt : BOOL ;	//Fehler (Drahtbruch / Kurzschluss)
+   END_STRUCT ;	
+   stSim : STRUCT 	//Peripheriewert simulieren
+    bEn : BOOL ;	//Simulation einschalten
+    iVal : INT ;	//Simulationswert (Peripheriewert!)
+   END_STRUCT ;	
+   stParam : STRUCT 	//Parameterdaten
+    stScale : STRUCT 	//Eingangswert skalieren
+     iHigh : INT ;	//Maximaler Wertebereich
+     iLow : INT ;	//Minimaler Wertebereich
+    END_STRUCT ;	
+    iSubsVal : INT ;	//Ersatzwert bei Drahtbruch / Kurzschluss
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "AI4-20" : VOID
+TITLE =AI4-20
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : 'AI4-20'
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  AI_TYPE : "AI4-20_TYPE";	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      SET   ; 
+      L     P##AI_TYPE; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     LW     0; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [LW 0]; 
+// Simulationswert
+      L     DBW [AR1,P#8.0]; 
+// Simulation Ein
+      U     DBX [AR1,P#6.0]; 
+      SPB   j001; 
+// Eingang Peripherie
+      L     DBW [AR1,P#0.0]; 
+// Simulationswert
+      T     DBW [AR1,P#8.0]; 
+j001: L     28512; 
+      >I    ; 
+      =     L      0.0; 
+      TAK   ; 
+      L     -345; 
+      <I    ; 
+      O     L      0.0; 
+// Fehler
+      =     DBX [AR1,P#4.0]; 
+      SPBN  j002; 
+// Ersatzwert
+      L     DBW [AR1,P#14.0]; 
+// Ausgangswert
+      T     DBW [AR1,P#2.0]; 
+      BEA   ; 
+j002: TAK   ; 
+      T     LW     0; 
+      L     27648; 
+      <I    ; 
+      SPB   j004; 
+      T     LW     0; 
+j004: TAK   ; 
+      L     0; 
+      >I    ; 
+      SPB   j005; 
+      T     LW     0; 
+// Messbereich Maximal
+j005: L     DBW [AR1,P#10.0]; 
+// Messbereich Minimal
+      L     DBW [AR1,P#12.0]; 
+      T     LW     2; 
+      -I    ; 
+      L     LW     0; 
+      *D    ; 
+      L     27648; 
+      /D    ; 
+      L     LW     2; 
+      +I    ; 
+// Skalierter Ausgangswert
+      T     DBW [AR1,P#2.0]; 
+      BE    ; 
+
+
+END_FUNCTION
+

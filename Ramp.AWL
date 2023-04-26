@@ -1,0 +1,136 @@
+TYPE "RAMP_TYPE"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : RMP_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   stInput : STRUCT 	//Eingänge
+    bReset : BOOL ;	//Zurücksetzen
+    iSetVal : INT ;	//Sollwert
+   END_STRUCT ;	
+   stOutput : STRUCT 	//Ausgänge
+    bAct : BOOL ;	//Rampe aktiv
+    iOut : INT ;	//Ausgangswert Integerform
+    rOut : REAL ;	//Ausgangswert Gleitpunktform
+   END_STRUCT ;	
+   stParam : STRUCT 	//Parameter
+    rVeloPos : REAL ;	//Geschwindigkeit für das "Auframpen"
+    rVeloNeg : REAL ;	//Geschwindigkeit für das "Abrampen"
+    rTaskTime : REAL ;	//Zykluszeit in Sekunden
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "RAMP" : VOID
+TITLE =RAMP
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : RAMP
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  RAMP_TYPE : "RAMP_TYPE";	
+END_VAR
+VAR_TEMP
+  bRun : BOOL ;	
+  bDir : BOOL ;	
+  iTemp : INT ;	
+  diTempSet : DINT ;	
+  rTempOut : REAL ;	
+  rTempVelo : REAL ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =Reset / Beenden
+
+      SET   ; 
+      L     P##RAMP_TYPE; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #iTemp; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#iTemp]; 
+// bReset
+      U     DBX [AR1,P#0.0]; 
+      O     "RunUp"; 
+      SPBN  j001; 
+      L     0; 
+// iOut
+      T     DBW [AR1,P#6.0]; 
+      L     0.000000e+000; 
+// rOut
+      T     DBD [AR1,P#8.0]; 
+      CLR   ; 
+// bAct
+      =     DBX [AR1,P#4.0]; 
+      BEA   ; 
+NETWORK
+TITLE =Rampe Startbedingung
+
+// iSetVal
+j001: L     DBW [AR1,P#2.0]; 
+      ITD   ; 
+      T     #diTempSet; 
+// rOut
+      L     DBD [AR1,P#8.0]; 
+      T     #rTempOut; 
+      RND   ; 
+      <>D   ; 
+      =     #bRun; 
+      >D    ; 
+      =     #bDir; 
+      UN    #bRun; 
+      SPB   j004; 
+
+NETWORK
+TITLE =Rampe berechnen
+
+// rVeloPos (Wird immer positiv ausgewertet)
+      L     DBD [AR1,P#12.0]; 
+      L     DW#16#7FFFFFFF; 
+      UD    ; 
+      T     #rTempVelo; 
+      U     #bDir; 
+      SPB   j002; 
+// rVeloNeg (Wird immer negativ ausgewertet)
+      L     DBD [AR1,P#16.0]; 
+      L     DW#16#80000000; 
+      OD    ; 
+      T     #rTempVelo; 
+// rTaskTime
+j002: L     DBD [AR1,P#20.0]; 
+      *R    ; 
+      L     #rTempOut; 
+      +R    ; 
+      T     #rTempOut; 
+      RND   ; 
+      L     #diTempSet; 
+      >D    ; 
+      U     #bDir; 
+      SPBN  j003; 
+      DTR   ; 
+      T     #rTempOut; 
+      SPA   j004; 
+j003: SET   ; 
+      <D    ; 
+      UN    #bDir; 
+      SPBN  j004; 
+      DTR   ; 
+      T     #rTempOut; 
+j004: L     #rTempOut; 
+// rOut
+      T     DBD [AR1,P#8.0]; 
+      RND   ; 
+// iOut
+      T     DBW [AR1,P#6.0]; 
+      U     #bRun; 
+// bAct
+      =     DBX [AR1,P#4.0]; 
+      BE    ; 
+
+END_FUNCTION
+
