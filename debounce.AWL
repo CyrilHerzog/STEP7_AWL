@@ -6,9 +6,9 @@ VERSION : 0.1
 
 
   STRUCT 	
-   bIn : BOOL ;	//Eingang 
-   bOut : BOOL ;	//Ausgang
-   tTime : TIME ;	//Entprellzeit
+   stParam : STRUCT 	
+    tTime : TIME ;	//Entprellzeit
+   END_STRUCT ;	
    stPrivate : STRUCT 	//Private Variablen (Instanz)
     bInFp : BOOL ;	
     bInFn : BOOL ;	
@@ -19,86 +19,124 @@ VERSION : 0.1
   END_STRUCT ;	
 END_TYPE
 
-FUNCTION "DEBOUNCE" : VOID
+FUNCTION "DEBOUNCE" : BOOL
 TITLE =DEBOUNCE
+//Herzog Cyril
+//18.09.2023
 AUTHOR : HECY
 FAMILY : BIS_BA
 NAME : DEBOUNCE
 VERSION : 0.1
 
 
+VAR_INPUT
+  bIn : BOOL ;	
+END_VAR
 VAR_IN_OUT
-  DEBOUNCE_TYPE : "DEBOUNCE_TYPE";	
+  pDebounce_Type : "DEBOUNCE_TYPE";	
+END_VAR
+VAR_TEMP
+  _dwSaveAR2 : DWORD ;	
+  _stData : STRUCT 	
+   iDB : INT ;	
+   bInFP : BOOL ;	
+   bInFN : BOOL ;	
+   bTON : BOOL ;	
+   bTOF : BOOL ;	
+   bIn : BOOL ;	
+   bOut : BOOL ;	
+   bTemp : BOOL ;	
+  END_STRUCT ;	
 END_VAR
 BEGIN
 NETWORK
 TITLE =
 
       SET   ; 
-// Datenbaustein öffnen
-      L     P##DEBOUNCE_TYPE; 
+      TAR2  #_dwSaveAR2; 
+      LAR2  P##_stData; 
+
+NETWORK
+TITLE =
+
+      L     P##pDebounce_Type; 
       LAR1  ; 
       L     W [AR1,P#0.0]; 
-      T     LW     0; 
+      T     #_stData.iDB; 
       L     D [AR1,P#2.0]; 
       LAR1  ; 
-      AUF   DB [LW 0]; 
-// bIn
-      U     DBX [AR1,P#0.0]; 
-      =     L      0.0; 
-// bInFp
-      FP    DBX [AR1,P#6.0]; 
-      =     L      0.1; 
-      U     L      0.0; 
-// bInFn
-      FN    DBX [AR1,P#6.1]; 
-      O     L      0.1; 
+      AUF   DB [#_stData.iDB]; 
+      L     W [AR1,P#4.0]; // stPrivate[0]
+      T     W [AR2,P#2.0]; // _stData[2]
+
+
+NETWORK
+TITLE =
+
+      U     #bIn; 
+      =     #_stData.bIn; 
+      FP    #_stData.bInFP; 
+      =     #_stData.bTemp; 
+      U     #_stData.bIn; 
+      FN    #_stData.bInFN; 
+      O     #_stData.bTemp; 
       SPBN  j001; 
-      L     "SysTick"; 
-// diTicksPre
-      T     DBD [AR1,P#8.0]; 
+      L     "__SYS_TICK"; 
+      T     D [AR1,P#6.0]; // diTicksPre
 
-// Timer 1 - Einschaltverzögerung
-j001: U     L      0.0; 
-// bTon
-      UN    DBX [AR1,P#6.2]; 
+
+NETWORK
+TITLE =
+
+j001: U     #_stData.bIn; 
+      UN    #_stData.bTON; 
       SPBN  j002; 
-      L     "SysTick"; 
-// diTicksPre
-      L     DBD [AR1,P#8.0]; 
+      L     "__SYS_TICK"; 
+      L     D [AR1,P#6.0]; // diTicksPre
       -D    ; 
-// tTime
-      L     DBD [AR1,P#2.0]; 
+      L     D [AR1,P#0.0]; // tTime
       >=D   ; 
-// bTon
-      S     DBX [AR1,P#6.2]; 
-// bOut
-      S     DBX [AR1,P#0.1]; 
-j002: UN    L      0.0; 
-// bTon
-      R     DBX [AR1,P#6.2]; 
+      =     #_stData.bTON; 
+j002: UN    #_stData.bIn; 
+      R     #_stData.bTON; 
 
-// Timer 2 - Aussschaltverzögerung
-// bTon
-      UN    DBX [AR1,P#6.2]; 
-// bTof
-      UN    DBX [AR1,P#6.3]; 
+
+NETWORK
+TITLE =
+
+      UN    #_stData.bIn; 
+      UN    #_stData.bTOF; 
       SPBN  j003; 
-      L     "SysTick"; 
-// diTicksPre
-      L     DBD [AR1,P#8.0]; 
+      L     "__SYS_TICK"; 
+      L     D [AR1,P#6.0]; // diTicksPre
       -D    ; 
-// tTime
-      L     DBD [AR1,P#2.0]; 
+      L     D [AR1,P#0.0]; // tTime
       >=D   ; 
 // bTof
-      S     DBX [AR1,P#6.3]; 
-// bOut
-      R     DBX [AR1,P#0.1]; 
-j003: U     L      0.0; 
-// bTof
-      R     DBX [AR1,P#6.3]; 
+      =     #_stData.bTOF; 
+j003: U     #_stData.bIn; 
+      R     #_stData.bTOF; 
+
+
+NETWORK
+TITLE =
+
+      U     #_stData.bTON; 
+      S     #_stData.bOut; 
+      U     #_stData.bTOF; 
+      R     #_stData.bOut; 
+      U     #_stData.bOut; 
+      =     #RET_VAL; 
+
+
+NETWORK
+TITLE =
+
+      L     W [AR2,P#2.0]; // _stData[2]
+      T     W [AR1,P#4.0]; // stPrivate[0]
+      LAR2  #_dwSaveAR2; 
       BE    ; 
+
 
 END_FUNCTION
 

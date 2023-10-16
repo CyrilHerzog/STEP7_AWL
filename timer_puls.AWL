@@ -1,0 +1,103 @@
+TYPE "TIMER_TYPE"
+VERSION : 0.1
+
+
+  STRUCT 	
+   stParam : STRUCT 	
+    tTime : TIME ;	
+   END_STRUCT ;	
+   tPast : TIME ;	//past time for monitoring
+   stPrivate : STRUCT 	
+    bFlagMem : BOOL ;	//save last state of input
+    bReached : BOOL ;	//time reached
+    diTicksPre : DINT ;	//save current ticks
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "TIMER_PULS" : BOOL
+TITLE = TIMER_PULS
+//V1.0
+//29.06.2023
+//Herzog Cyril
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : TIM_PLS
+VERSION : 0.1
+
+
+VAR_INPUT
+  bIn : BOOL ;	
+END_VAR
+VAR_IN_OUT
+  pTimer_Type : "TIMER_TYPE";	
+END_VAR
+VAR_TEMP
+  _dwSaveAR2 : DWORD ;	
+  _stInstance : STRUCT 	
+   iDB : INT ;	
+   stState : STRUCT 	
+    bInPre : BOOL ;	
+    bReached : BOOL ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE = 
+
+      SET   ; 
+      TAR2  #_dwSaveAR2; 
+      LAR2  P##_stInstance; 
+
+NETWORK
+TITLE =
+
+      L     P##pTimer_Type; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #_stInstance.iDB; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#_stInstance.iDB]; 
+      L     W [AR1,P#8.0]; 
+      T     W [AR2,P#2.0]; 
+
+NETWORK
+TITLE =
+
+      U     #bIn; 
+      FP    #_stInstance.stState.bInPre; 
+      UN    #_stInstance.stState.bReached; 
+      S     #_stInstance.stState.bReached; 
+      SPBN  j001; 
+      L     "__SYS_TICK"; 
+      T     D [AR1,P#10.0]; 
+j001: U     #_stInstance.stState.bReached; 
+      SPBN  j002; 
+// if ((current_ticks - ticks_pre >= time_para) {...
+      L     "__SYS_TICK"; 
+      L     D [AR1,P#10.0]; // previous ticks
+      -D    ; 
+      T     D [AR1,P#4.0]; // past time
+      L     D [AR1,P#0.0]; // time param
+      >=D   ; 
+      R     #_stInstance.stState.bReached; 
+
+NETWORK
+TITLE =
+
+j002: L     W [AR2,P#2.0]; 
+      T     W [AR1,P#8.0]; 
+      LAR2  #_dwSaveAR2; 
+
+
+NETWORK
+TITLE =
+
+      U     #_stInstance.stState.bReached; 
+      =     #RET_VAL; 
+      BE    ; 
+
+END_FUNCTION
+

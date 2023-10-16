@@ -1,0 +1,62 @@
+TYPE "REG_16BIT_TYPE"
+
+
+  STRUCT 	// Typbeschreibung
+   bI0 : BOOL ;	
+   bI1 : BOOL ;	
+   bI2 : BOOL ;	
+   bI3 : BOOL ;	
+   bI4 : BOOL ;	
+   bI5 : BOOL ;	
+   bI6 : BOOL ;	
+   bI7 : BOOL ;	
+   bI8 : BOOL ;	
+   bI9 : BOOL ;	
+   bI10 : BOOL ;	
+   bI11 : BOOL ;	
+   bI12 : BOOL ;	
+   bI13 : BOOL ;	
+   bI14 : BOOL ;	
+   bI15 : BOOL ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "NEG_FLAG_16BIT" : BOOL
+TITLE =NEG_FLAG_16BIT
+//Herzog Cyril
+//18.09.2023
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : NFLAG_16
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  stBits : "REG_16BIT_TYPE";	
+  wMem : WORD ;	//Externer Speicher (Hilfsdatenwort)
+END_VAR
+VAR_TEMP
+  _iTemp : INT ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      L     P##stBits; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #_iTemp; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#_iTemp]; 
+      L     W [AR1,P#0.0]; 
+      T     #_iTemp; 
+      L     #wMem; 
+      <I    ; 
+      =     #RET_VAL; 
+      L     #_iTemp; 
+      T     #wMem; 
+      BE    ; 
+
+END_FUNCTION
+

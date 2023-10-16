@@ -1,0 +1,39 @@
+FUNCTION "MEMORY_CLEAR" : VOID
+TITLE =MEMORY_CLEAR
+//Herzog Cyril
+//18.09.2023
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : MEMCLR
+VERSION : 0.1
+
+
+VAR_INPUT
+  pAdr : POINTER ;	
+  iLen : INT ;	
+END_VAR
+VAR_TEMP
+  _iTemp : INT ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      L     P##pAdr; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #_iTemp; 
+      L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#_iTemp]; 
+      L     #iLen; 
+j001: T     #_iTemp; 
+      L     B#16#0; 
+      T     B [AR1,P#0.0]; 
+      +AR1  P#1.0; 
+      L     #_iTemp; 
+      LOOP  j001; 
+      BE    ; 
+
+END_FUNCTION
+
