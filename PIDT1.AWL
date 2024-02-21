@@ -99,8 +99,12 @@ TITLE =Reset / Manuel Mode / Parameter DB
       R     DBX [AR1,P#8.1]; 
       BEA   ; 
 
+
 // iError
-j001: L     DBW [AR1,P#24.0]; 
+j001: CLR   ; 
+      =     #bErrPos; 
+      =     #bErrNeg; 
+      L     DBW [AR1,P#24.0]; 
       T     #iErrorPre; 
 // tTn
       L     DBD [AR1,P#38.0]; 
