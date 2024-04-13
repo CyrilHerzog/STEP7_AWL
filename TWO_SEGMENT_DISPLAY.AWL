@@ -1,0 +1,50 @@
+FUNCTION "TWO_SEGMENT_DISPLAY" : BYTE
+TITLE = TWO_SEGMENT_DISPLAY
+//Herzog Cyril
+//14.08.23
+AUTHOR : HECY
+VERSION : 0.1
+
+
+VAR_INPUT
+  iVal : INT ;	
+END_VAR
+VAR_TEMP
+  _iVal : INT ;	// input value
+  _iMod : INT ;	// modulo 10 (input value % 10)
+END_VAR
+BEGIN
+NETWORK
+TITLE = 
+
+      SET   ; 
+// limit in range 0 - 99
+      L     #iVal; 
+      T     #_iVal; 
+      L     99; 
+      <I    ; 
+      SPB   j001; 
+      T     #_iVal; 
+j001: TAK   ; 
+      L     0; 
+      >I    ; 
+      SPB   j002; 
+      T     #_iVal; 
+// calc => segment 1 (one's) = iVal % 10
+//         segment 2 (ten's) = iVal / 10
+j002: L     #_iVal; 
+      L     10; 
+      MOD   ; 
+      T     #_iMod; 
+      L     #_iVal; 
+      L     10; 
+      /I    ; 
+      SLW   4; 
+      L     #_iMod; 
+      OW    ; 
+// assign output => ret = (((ten's) << 4) || one's)
+      T     #RET_VAL; 
+      BE    ; 
+
+END_FUNCTION
+

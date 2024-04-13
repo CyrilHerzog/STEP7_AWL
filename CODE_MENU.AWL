@@ -1,0 +1,196 @@
+TYPE "CODE_MENU_TYPE"
+VERSION : 0.1
+
+
+  STRUCT 	
+   iCode : INT ;	
+   iIndex : INT ;	
+   stPrivate : STRUCT 	
+    bFlagMem : BOOL ;	
+    iLoopCnt : INT ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "CODE_MENU" : WORD
+TITLE = CODE_MENU
+//Herzog Cyril
+//14.08.23
+//
+//
+//
+//
+//RET_VAL (Prog - Error) => 8001 : parameter with wrong argument
+//                          8002 : parameter with not supported data type
+//                          8004 : parameter with wrong memory location
+//                          8008 : parameter with wrong array length
+AUTHOR : HECY
+FAMILY : HC_AUT
+NAME : CDE_MENU
+VERSION : 0.1
+
+
+VAR_INPUT
+  bScroll : BOOL ;	
+END_VAR
+VAR_IN_OUT
+  pSel : ANY ;	// // support Byte, array of [anyType], struct
+  pList : ANY ;	
+  pMENU_TYPE : "CODE_MENU_TYPE";	
+END_VAR
+VAR_TEMP
+  _dwSaveAR2 : DWORD ;	
+  _iTemp : INT ;	
+  _stInstance : STRUCT 	
+   iDB : INT ;	
+   iIndex : INT ;	
+   iLoopCnt : INT ;	
+  END_STRUCT ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE = save AR2
+
+      SET   ; 
+      TAR2  #_dwSaveAR2; 
+NETWORK
+TITLE = load private instance data
+
+      L     P##pMENU_TYPE; 
+      LAR2  ; 
+      L     0; 
+      L     W [AR2,P#0.0]; 
+      T     #_stInstance.iDB; 
+// check the memory location => DB
+      ==I   ; 
+      L     W#16#8004; 
+      SPB   JERR; 
+      L     D [AR2,P#2.0]; 
+      LAR2  ; 
+      AUF   DB [#_stInstance.iDB]; 
+      L     W [AR2,P#6.0]; 
+      T     #_stInstance.iLoopCnt; 
+
+NETWORK
+TITLE = scoll up
+
+      U     #bScroll; 
+      FP     [AR2,P#4.0]; 
+      SPBN  j001; 
+      L     #_stInstance.iLoopCnt; 
+      L     1; 
+      -I    ; 
+      T     #_stInstance.iLoopCnt; 
+
+NETWORK
+TITLE = check input pSel, determine number of bit-check repetitions
+
+j001: L     P##pSel; 
+      LAR1  ; 
+      L     B [AR1,P#1.0]; 
+      L     2; 
+// check parameter type => Byte
+      ==I   ; 
+      L     W#16#8002; 
+      SPBN  JERR; 
+// repeat (loopCnt) = n-bytes * 8
+      L     W [AR1,P#2.0]; 
+      SLW   3; 
+      T     #_iTemp; 
+// check range of saved loop-count
+      L     0; 
+      L     #_stInstance.iLoopCnt; 
+// saved count <= 0?
+      >=I   ; 
+      L     #_iTemp; 
+      SPB   j002; 
+// saved count > max possible count of pSel
+      >I    ; 
+      SPB   j002; 
+      TAK   ; 
+j002: T     #_stInstance.iLoopCnt; 
+// iTemp = max possible count (max)
+// address offset = max - cnt
+      L     #_iTemp; 
+      L     #_stInstance.iLoopCnt; 
+      -I    ; 
+      T     #_stInstance.iIndex; 
+// save data block number
+      L     W [AR1,P#4.0]; 
+      T     #_iTemp; 
+// load pointer address and add address offset
+      L     D [AR1,P#6.0]; 
+      LAR1  ; 
+      L     #_stInstance.iIndex; 
+      +AR1  ; 
+NETWORK
+TITLE = check the "set-bits" in a loop
+
+      AUF   DB [#_iTemp]; 
+      L     #_stInstance.iLoopCnt; 
+j003: T     #_stInstance.iLoopCnt; 
+      U      [AR1,P#0.0]; 
+      SPB   j004; 
+      +AR1  P#0.1; 
+      L     #_stInstance.iLoopCnt; 
+      LOOP  j003; 
+      L     0; 
+      T     #_stInstance.iLoopCnt; 
+      SPA   JEND; 
+NETWORK
+TITLE = 
+
+j004: L     P##pList; 
+      LAR1  ; 
+      L     B [AR1,P#1.0]; 
+      L     2; 
+      ==I   ; 
+// check parameter type => Byte
+      L     W#16#8002; 
+      SPBN  JERR; 
+      L     #_stInstance.iLoopCnt; 
+      L     W [AR1,P#2.0]; 
+      >I    ; 
+// parameter with wrong array length
+      L     W#16#8008; 
+      SPB   JERR; 
+// save data block number
+      L     W [AR1,P#4.0]; 
+      T     #_iTemp; 
+      L     D [AR1,P#6.0]; 
+      LAR1  ; 
+      AUF   DB [#_iTemp]; 
+      L     #_stInstance.iIndex; 
+// *2  => (offset for integer), *8 => byte address offset
+      SLW   4; 
+      +AR1  ; 
+// iCode
+      L     W [AR1,P#0.0]; 
+NETWORK
+TITLE = store private instance data
+
+JEND: AUF   DB [#_stInstance.iDB]; 
+// value of iCode is in accumulator 1
+      T     W [AR2,P#0.0]; 
+      L     #_stInstance.iIndex; 
+      T     W [AR2,P#2.0]; 
+      L     #_stInstance.iLoopCnt; 
+      T     W [AR2,P#6.0]; 
+// no error
+      L     0; 
+      T     #RET_VAL; 
+      SPA   j005; 
+
+NETWORK
+TITLE = error state
+
+JERR: T     #RET_VAL; 
+
+NETWORK
+TITLE = restore AR2
+
+j005: LAR2  #_dwSaveAR2; 
+      BE    ; 
+
+END_FUNCTION
+

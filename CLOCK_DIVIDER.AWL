@@ -1,0 +1,69 @@
+TYPE "CLK_DIV_TYPE"
+AUTHOR : HECY
+FAMILY : HC_AUT
+VERSION : 0.1
+
+
+  STRUCT 	
+   byPrivate : BYTE ;	//private memory 
+   bDiv_2 : BOOL ;	
+   bDiv_4 : BOOL ;	
+   bDiv_8 : BOOL ;	
+   bDiv_16 : BOOL ;	
+   bDiv_32 : BOOL ;	
+   bDiv_64 : BOOL ;	
+   bDiv_128 : BOOL ;	
+   bDiv_256 : BOOL ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "CLOCK_DIVIDER" : WORD
+TITLE =CLOCK DIVIDER
+//Herzog Cyril
+//14.08.23
+AUTHOR : HECY
+FAMILY : HC_AUT
+NAME : CLK_DIV
+VERSION : 0.1
+
+
+VAR_INPUT
+  bClk : BOOL ;	
+END_VAR
+VAR_IN_OUT
+  pCLK_DIV_TYPE : "CLK_DIV_TYPE";	
+END_VAR
+VAR_TEMP
+  iTemp : INT ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      SET   ; 
+      L     P##pCLK_DIV_TYPE; 
+      LAR1  ; 
+      L     0; 
+      L     W [AR1,P#0.0]; 
+      T     #iTemp; 
+      ==I   ; 
+      SPBN  j001; 
+// check memory location => DB
+      L     W#16#8004; 
+      T     #RET_VAL; 
+      BEA   ; 
+j001: L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#iTemp]; 
+      U     #bClk; 
+      FP     [AR1,P#0.0]; 
+      SPBN  j002; 
+      L     B [AR1,P#1.0]; 
+      INC   1; 
+      T     B [AR1,P#1.0]; 
+j002: L     0; 
+      T     #RET_VAL; 
+      BE    ; 
+
+END_FUNCTION
+

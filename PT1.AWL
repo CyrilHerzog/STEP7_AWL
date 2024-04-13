@@ -73,7 +73,7 @@ j001: L     L#0;
       ITD   ; 
       DTR   ; 
 // rY
-      T     DBW [AR1,P#6.0]; 
+      T     DBD [AR1,P#6.0]; 
       BEA   ; 
 j002: DTR   ; 
       T     #rTemp; 
