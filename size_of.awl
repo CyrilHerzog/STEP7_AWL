@@ -1,0 +1,34 @@
+﻿FUNCTION "size_of" : Int
+TITLE = SIZE_OF
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+//Autor     : Herzog Cyril
+//Version : V1.0
+//
+   VAR_IN_OUT 
+      pObj : Any;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = 
+// any-pointer
+// Byte 0: 10h (for S7)
+// Byte 1: Data Type
+// Byte 2-3: Repeat factor
+// Byte 4-5: Data Block Num (DB) or 0
+// Byte 6-9: Pointer (Memory Location, Byteaddress, Bitaddress)
+
+// idea => a structure is an object consisting of a variable number of bytes
+
+      L P##pObj;
+      LAR1;
+      L W[ AR1, P#2.0];// repeat factor
+      T #size_of;
+      BEA;
+
+
+
+END_FUNCTION
+

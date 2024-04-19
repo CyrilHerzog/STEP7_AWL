@@ -1,0 +1,253 @@
+﻿TYPE "ai_channel_t"
+VERSION : 0.1
+   STRUCT
+      i_wPeri { ExternalVisible := 'False'} : Word;   // Processwert (PEW / EW)
+      i_stParam { ExternalVisible := 'False'} : Struct   // Parameterdaten
+         bEnSim { ExternalVisible := 'False'} : Bool;   // Simulation einschalten
+         bEnFilter { ExternalVisible := 'False'} : Bool;   // Filter zuschalten
+         bEnHoldLastVal { ExternalVisible := 'False'} : Bool;   // Fehlerfall => true = letzter gültiger Wert halten / false = Ersatzwert
+         iSimVal { ExternalVisible := 'False'} : Int;   // Simulationswert (Processwert 20mA = 27648)
+         stScale { ExternalVisible := 'False'} : Struct   // Eingangswert skalieren
+            iHigh { ExternalVisible := 'False'} : Int;   // Maximaler Wertebereich
+            iLow { ExternalVisible := 'False'} : Int;   // Minimaler Wertebereich
+         END_STRUCT;
+         iSubsVal { ExternalVisible := 'False'} : Int;   // Ersatzwert bei Drahtbruch / Kurzschluss, wenn bEnHoldLastVal = false
+         tFilter { ExternalVisible := 'False'} : Time;   // Filterkonstante (z.B T#5s)
+      END_STRUCT;
+      o_stState { ExternalVisible := 'False'} : Struct
+         iValue { ExternalVisible := 'False'} : Int;   // Skalierter Ausgangswert
+         bFlt { ExternalVisible := 'False'} : Bool;   // Summenfehler
+         bPvLimHi { ExternalVisible := 'False'} : Bool;   // Überstrom
+         bPvLimLo { ExternalVisible := 'False'} : Bool;   // Drahtbruch
+         bSim { ExternalVisible := 'False'} : Bool;   // Simulation aktiv
+         stScale { ExternalVisible := 'False'} : Struct   // Skalierung für Weiterverschaltung
+            iHigh { ExternalVisible := 'False'} : Int;
+            iLow { ExternalVisible := 'False'} : Int;
+         END_STRUCT;
+      END_STRUCT;
+      stInstance { ExternalVisible := 'False'} : Struct   // Instanzdaten (Privat) 
+         rPT1 { ExternalVisible := 'False'} : Real;
+         iLastValidVal { ExternalVisible := 'False'} : Real;
+      END_STRUCT;
+   END_STRUCT;
+
+END_TYPE
+
+FUNCTION "read_analog_channel" : Word
+TITLE = read_analog_channel (4-20mA)
+{ S7_Optimized_Access := 'FALSE' }
+AUTHOR : HECY
+FAMILY : BIS_BA
+VERSION : 0.1
+//Autor     : Herzog Cyril
+//Version : V1.0
+//Datum  : 21.02.24
+//Inhalt    : Skalieren und Filtern von Analog EIngangskanal (Mit Fehlerauswertung)
+   VAR_IN_OUT 
+      pChannel : "ai_channel_t";
+   END_VAR
+
+   VAR_TEMP 
+      _dwSaveAR2 : DWord;
+      _stInput : Struct
+         iDB : Int;
+         bEnSim : Bool;
+         bEnFilter : Bool;
+         bEnHoldLastVal : Bool;
+      END_STRUCT;
+      _stState : Struct
+         iValue : Int;
+         bFlt : Bool;
+         bPeriLimHi : Bool;
+         bPeriLimLo : Bool;
+         bSim : Bool;
+         stScale : Struct
+            iMin : Int;
+            iMax : Int;
+         END_STRUCT;
+      END_STRUCT;
+      _rT1 : Real;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = 
+      SET;
+      TAR2 #_dwSaveAR2;// Adressregister 2 sichern
+
+NETWORK
+TITLE = 
+
+      L P##pChannel;
+      LAR1;
+      L 0;
+      L W[ AR1, P#0.0];
+      T #_stInput.iDB;
+// Prüfe ob Instanz-Struktur in einem Datenbaustein liegt
+      ==I;
+      SPBN j001;
+      L W#16#8004          ;// Fehler => Parameter im falschen Speicherbereich
+      T #read_analog_channel;
+      BEA;
+j001:      L D[ AR1, P#2.0];
+      LAR1;
+      AUF DB[ #_stInput.iDB];
+
+NETWORK
+TITLE = 
+
+      L P##_stInput;
+      LAR2;
+// Kopiere Eingangsparameter in lokalen Speicherbereich
+      L W[ AR1, P#2.0]     ;// i_stParam
+      T W[ AR2, P#2.0];// _stInput[2]
+      L W[ AR1, P#6.0]      ;// i_stParam.stScale.rmax
+      T #_stState.stScale.iMax;
+      L W[ AR1, P#8.0]      ;// i_stParam.stScale.rmin
+      T #_stState.stScale.iMin;
+
+
+
+NETWORK
+TITLE = 
+// Simulation
+      L W[ AR1, P#4.0]     ;// i_stParam.iSimVal
+      U #_stInput.bEnSim;
+      = #_stState.bSim;
+      SPB j002;
+// Aktualisiere Simulationswert mit aktuellem Peripheriewert
+      L W[ AR1, P#0.0]     ;// i_wPeri
+      T W[ AR1, P#4.0];// iSimPeri
+
+
+NETWORK
+TITLE = 
+// Messwert überprüfen
+j002:      L 28512              ;// pv-high limit => Kurzschluss
+      >I;
+      = #_stState.bPeriLimHi;
+      TAK;
+      L -345               ;// pv-low limit => Drahtbruch
+      <I;
+      = #_stState.bPeriLimLo;
+      U #_stState.bPeriLimLo;
+      O #_stState.bPeriLimHi;
+      = #_stState.bFlt     ;// Sammelfehler
+      TAK;
+      SPBN j003;
+// Ersatzwer laden
+      L W[ AR1, P#10.0]     ;// iSubsVal
+// Letzter gültiger Wert selektieren
+      U #_stInput.bEnHoldLastVal;
+      SPBN j004;
+      L W[ AR1, P#24.0];// wLastValidValue
+      SPA j004;
+
+NETWORK
+TITLE = 
+// Linear Skalieren
+// f(x) = m * x + c
+// stState.iValue = (stScale.Max - stScale.Min) * wPeri / 27648 + stScale.Min
+j003:      T #_stState.iValue;
+      L #_stState.stScale.iMax;
+      L #_stState.stScale.iMin;
+      -I;
+      L #_stState.iValue;
+      *D;
+      L 27648;
+      /D;
+      L #_stState.stScale.iMin;
+      +I;
+j004:      T #_stState.iValue;
+
+
+
+NETWORK
+TITLE = 
+// Begrenzen der Ausgangsgrösse auf den Skalierungsbereich
+      L #_stState.stScale.iMax;
+      <I;
+      SPB j005;
+      T #_stState.iValue;
+j005:      TAK;
+      L #_stState.stScale.iMin;
+      >I;
+      SPB j006;
+      T #_stState.iValue;
+
+
+
+NETWORK
+TITLE = 
+// Filter 1.Ordnung
+// G(s) = 1 / (1 + Ts)
+// y = -dy/dt * T + k * x
+
+j006:      U "__RUN_UP";
+      SPBN j007;
+      L 0.0;
+      SPA j009;
+    // reset
+j007:      L 0;
+      L D[ AR1, P#12.0]     ;// filter time
+      <D;
+      U #_stInput.bEnFilter;
+      SPB j008;
+      L #_stState.iValue;
+      ITD;
+      DTR;
+      SPA j009;
+j008:      DTR;
+      T #_rT1;
+      L #_stState.iValue;
+      ITD;
+      DTR;
+      L D[ AR1, P#24.0]     ;// stInstance.rPT1
+      -R;
+      L "__OB35_CYCLE_TIME";
+      DTR;
+      *R;
+      L #_rT1;
+      /R;
+      L D[ AR1, P#24.0]     ;// stInstance.rPT1
+      +R;
+j009:      T D[ AR1, P#24.0]     ;// stInstance.rPT1
+      RND;
+      T #_stState.iValue;
+
+NETWORK
+TITLE = 
+// Speichere gültigen Eingangswert
+      U #_stState.bFlt;
+      SPB j010;
+      L #_stState.iValue;
+      T W[ AR1, P#28.0]     ;// lastValidValue
+
+
+
+NETWORK
+TITLE = 
+// Zuweisung Ausgänge
+j010:      L #_stState.iValue;
+      T W[ AR1, P#16.0]     ;// o_stState.iValue
+      L W[ AR2, P#6.0]      ;// _stState.bFlt...
+      T W[ AR1, P#18.0]     ;// o_stState.bFlt...
+      L #_stState.stScale.iMax;
+      T W[ AR1, P#20.0];// o_state.stScale.iHigh
+      L #_stState.stScale.iMin;
+      T W[ AR1, P#22.0];// o_state.stScale.iLow
+
+NETWORK
+TITLE = 
+
+      LAR2 #_dwSaveAR2;// Adressregister 2 wiederherstellen
+      L 0                  ;// Kein Fehler
+      T #read_analog_channel;
+      CLR;
+      BE;
+
+
+
+END_FUNCTION
+

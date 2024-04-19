@@ -1,0 +1,378 @@
+﻿TYPE "fifo_t"
+VERSION : 0.1
+   STRUCT
+      i_bInit { ExternalVisible := 'False'} : Bool;
+      i_bWrite : Bool;
+      i_bRead : Bool;
+      o_stState { ExternalVisible := 'False'} : Struct
+         bInit { ExternalVisible := 'False'} : Bool;
+         bEmpty { ExternalVisible := 'False'} : Bool;
+         bFull { ExternalVisible := 'False'} : Bool;
+      END_STRUCT;
+      stInstance { ExternalVisible := 'False'} : Struct
+         bInit { ExternalVisible := 'False'} : Bool;
+         bEmpty { ExternalVisible := 'False'} : Bool;
+         bFull { ExternalVisible := 'False'} : Bool;
+         bRes_0 { ExternalVisible := 'False'} : Bool;
+         bRes_1 { ExternalVisible := 'False'} : Bool;
+         bRes_2 { ExternalVisible := 'False'} : Bool;
+         bRes_3 { ExternalVisible := 'False'} : Bool;
+         bRes_4 { ExternalVisible := 'False'} : Bool;
+         bFirstRun { ExternalVisible := 'False'} : Bool;
+         diRdPtr { ExternalVisible := 'False'} : Int;
+         diWrPtr { ExternalVisible := 'False'} : Int;
+      END_STRUCT;
+   END_STRUCT;
+
+END_TYPE
+
+FUNCTION "fifo" : Word
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+//Autor     : Herzog Cyril
+//Version : 1.0
+//
+   VAR_IN_OUT 
+      pObj : Any;
+      pBuffer : Any;
+      pFifo : "fifo_t";
+   END_VAR
+
+   VAR_TEMP 
+      _dwSaveAR2 : DInt;
+      _stFifo : Struct
+         iDB : Int;
+         diPtr : DInt;
+         stInput : Struct
+            bInit : Bool;
+            bWrite : Bool;
+            bRead : Bool;
+            bTempRes_0 : Bool;   // Temporär Resultat für Binäre Verknüpfung
+            bTempRes_1 : Bool;   // Temporär Resultat für Binäre Verknüpfung
+         END_STRUCT;
+         stState : Struct
+            bInit : Bool;
+            bEmpty : Bool;
+            bFull : Bool;
+            bRes_0 : Bool;
+            bRes_1 : Bool;
+            bRes_2 : Bool;
+            bRes_3 : Bool;
+            bRes_4 : Bool;
+            bFirstRun : Bool;
+            iRdPtr : Int;
+            iWrPtr : Int;
+         END_STRUCT;
+      END_STRUCT;
+      _iObjSize : Int;
+      _iPtrLimit : Int;
+      _iDB_Obj : Int;
+      _iDB_Buffer : Int;
+      _iTempRes : Int;
+   END_VAR
+
+
+BEGIN
+NETWORK
+TITLE = 
+      SET;
+// Speichere Zustand von Adressregister 2 (Wird für die Bearbeitung von Instanz-Datenbausteinen verwendet)
+      TAR2 #_dwSaveAR2;
+NETWORK
+TITLE = 
+      L P##pFifo;
+      LAR1;
+      L 0;
+      L W[ AR1, P#0.0];// Datenbausteinnummer der FIFO-Struktur
+      T #_stFifo.iDB;
+// prüfe ob die FIFO-Struktur in einem Datenbaustein definiert wurde
+      ==I;
+      SPBN j020;
+      L W#16#8004;// Fehlercode => Parameter mit falschem  Speicherbereich
+      T #fifo;
+      BEA;
+j020:      L D[ AR1, P#2.0];
+      T #_stFifo.diPtr;// Zeiger der FIFO-Daten temporär speichern
+      LAR1;// Zeiger der FIFO-Daten laden
+      AUF DB[ #_stFifo.iDB];
+NETWORK
+TITLE = 
+      L P##_stFifo;
+      LAR2;
+// Kopieren der Eingangsbits in die temporäre Struktur
+      L W[ AR1, P#0.0];// i_bInit/bWrite/bRead
+      T W[ AR2, P#6.0];// _stFifo.stInput
+// Kopiere Zustand aus Instanzdaten in den Lokalbereich
+      L W[ AR1, P#4.0];// stInstance.bInit....
+      T W[ AR2, P#8.0];// _stFifo.stState
+      L W[ AR1, P#6.0];// stInstance.iRdPtr
+      T W[ AR2, P#10.0];// _stFifo.stState.iRdPtr
+      L W[ AR1, P#8.0];// stInstance.iWrPtr
+      T W[ AR2, P#12.0];// _stFifo.stState.iWrPtr
+
+NETWORK
+TITLE = Überprüfung der Bausteinverschaltung
+//Die Schnittstellenprüfung wird in jedem Zyklus durchgeführt. Dies ist für den Baustein-Anwender, aufgrund der Möglichkeit durch Online-Änderungen, der einfachste Fall. 
+//
+// Überprüfung des Verschalteten Ein/Ausgabe-Objektes
+      L P##pObj;
+      LAR1;
+      L B[ AR1, P#1.0];// Datentyp
+      L 2;
+// Der Grunddatentyp muss "Byte" sein
+      ==I;
+      = #_stFifo.stInput.bTempRes_0;
+      L W[ AR1, P#2.0];
+// Das Objekt muss aus mehr als einem Byte Zusammengesetzt sein => Struktur oder Array
+      >=I;
+      O #_stFifo.stInput.bTempRes_0;
+      SPB j040;
+      L 8000;// Fehlercode => Ungültiges Datenobjekt
+      T #fifo;
+      LAR2 #_dwSaveAR2;// Adressregister 2 wiederherstellen
+      BEA;
+// Überprüfung des Buffers
+j040:      L P##pBuffer;
+      LAR2;
+      L 2;
+      L B[ AR2, P#1.0];
+// Buffer muss vom Gruddatentyp "Byte" sein
+      ==I;
+      = #_stFifo.stInput.bTempRes_0;
+      L W[ AR2, P#2.0];// Anzahl vorhandene Bytes im Buffer
+      L W[ AR1, P#2.0];// Anzahl vorhandene Bytes im Datenobjekt
+      T #_iObjSize;// Speichern Grösse des Datenobjektes (Anzahl Bytes)
+      /I;
+      T #_iPtrLimit;// Dividiere Buffergrösse durch Datengrösse => Zeigerlimitierung
+      SRD 16;// Schiebe Akkumulator um den Modulo der Division zu erhalten
+// Die Buffergrösse muss exakt ein vielfaches der Grösse des Datenobjektes sein => Modulo = 0!
+      L 0;
+      ==I;
+      O #_stFifo.stInput.bTempRes_0;
+      SPB j050;
+      L 8000;// Fehlercode => Ungültiger Parameter
+      T #fifo;
+      LAR2 #_dwSaveAR2;// Adressregister 2 wiederherstellen
+      BEA;
+NETWORK
+TITLE = Setzen von Adresszeigern auf Buffer und Daten, sowie weiteren Parameterprüfung
+// Speichere mögliche Datenbausteinnummer von Datenobjekt und setze den Zeiger auf die Daten
+j050:      L W[ AR1, P#4.0];
+      T #_iDB_Obj;
+// Zeiger auf Objektdaten (AR1)
+      L D[ AR1, P#6.0];
+      LAR1;
+// Speichere Datenbausteinnummer von Buffer und setze den Zeiger auf die Daten
+      L 0;
+      L W[ AR2, P#4.0];
+      T #_iDB_Buffer;
+// prüfe ob Buffer in einem Datenbaustein definiert wurde
+      ==I;
+      SPBN j051;
+      L W#16#8004;// Fehlercode => Parameter mit falschem  Speicherbereich
+      T #fifo;
+      LAR2 #_dwSaveAR2;// Adressregister 2 wiederherstellen
+      BEA;
+// Zeiger auf Buffer (AR2)
+j051:      L D[ AR2, P#6.0];
+      LAR2;
+
+NETWORK
+TITLE = Überprüfe Eingangsoperation
+// Es ist nur eine aktive Bausteinoperation pro Durchlauf erlaubt
+// gültig => nur 1 Eingang aktiv
+      X #_stFifo.stInput.bWrite;
+      X #_stFifo.stInput.bRead;
+      X #_stFifo.stInput.bInit;
+// ungültig => alle Eingänge = true
+      UN(;
+      U #_stFifo.stInput.bWrite;
+      U #_stFifo.stInput.bRead;
+      U #_stFifo.stInput.bInit;
+      );
+      O(;
+// gültig => alle Eingänge = false
+      UN #_stFifo.stInput.bWrite;
+      UN #_stFifo.stInput.bRead;
+      UN #_stFifo.stInput.bInit;
+      );
+      = #_stFifo.stInput.bTempRes_0;
+      SPB j070;
+      L 8002;// Fehlercode => Ungültige Operation
+      T #fifo;
+      LAR2 #_dwSaveAR2;// Adressregister 2 wiederherstellen
+      BEA;
+NETWORK
+TITLE = Zustand "Schreiben"
+// Schreibbefehl aktiv ?
+j070:      U #_stFifo.stInput.bWrite;
+// Schreiben möglich ?
+      UN #_stFifo.stState.bFull;
+      SPBN j080;
+// Aktuellen Schreibzeiger mit Objekgrösse multiplizieren
+      L #_stFifo.stState.iWrPtr;
+      L #_iObjSize;
+      ITD;
+      *D;
+      SLD 3;// Bringe Ergebnis auf Zeiger-Format
+      +AR2;// Zeiger addieren => Neuer Offset für Kopierschleife
+// Kopierschleife für das Füllen den Daten in den Buffer
+      L #_iObjSize;
+j071:      T #_iObjSize;
+      AUF DB[ #_iDB_Obj];
+      L B[ AR1, P#0.0];
+      AUF DB[ #_iDB_Buffer];
+      T B[ AR2, P#0.0];
+      +AR1 P#1.0;
+      +AR2 P#1.0;
+      L #_iObjSize;
+      LOOP j071;
+// Schreibzeiger inkrementieren
+      L 1;
+      L #_stFifo.stState.iWrPtr;
+      +I;
+      T #_stFifo.stState.iWrPtr;
+      L #_iPtrLimit;
+      >=I;
+// Maximale Zeigergrösse erreicht ?
+      SPBN j072;
+      L 0;
+      T #_stFifo.stState.iWrPtr;
+j072:      L #_stFifo.diPtr;// Zeiger der Instanzdaten setzen
+      LAR1;
+      AUF DB[ #_stFifo.iDB];
+// Speichere aktuellen Schreibzeiger
+      L #_stFifo.stState.iWrPtr;
+      T W[ AR1, P#8.0];
+// FIFO ist nach Schreibvorgang auf Zustand "Nicht leer" setzen
+      CLR;
+      = #_stFifo.stState.bEmpty;
+// FIFO ist voll wenn Schreibzeiger == Lesezeiger ist (Nach aktiviertem Schreibbefehl)
+      L #_stFifo.stState.iWrPtr;
+      L 1;
+      +I;
+      T #_iTempRes;
+      L #_stFifo.stState.iRdPtr;
+      ==I;
+      = #_stFifo.stInput.bTempRes_0;
+// FIFO ist auch voll, wenn Lesezeiger = 0 und Schreibzeiger + 1 == Buffergrösse ist
+      L 0;
+      L #_stFifo.stState.iRdPtr;
+      ==I;
+      = #_stFifo.stInput.bTempRes_1;
+      L #_iTempRes;
+      L #_iPtrLimit;
+      ==I;
+      U #_stFifo.stInput.bTempRes_1;
+      O #_stFifo.stInput.bTempRes_0;
+      = #_stFifo.stState.bFull;
+
+NETWORK
+TITLE = Zustand "Lesen"
+// Lesebefehl aktiv?
+j080:      U #_stFifo.stInput.bRead;
+      UN #_stFifo.stState.bEmpty;
+      SPBN j090;
+// Kopierschleife für das Füllen den Daten in den Buffer
+// Aktuellen Lesezeiger mit Objekgrösse multiplizieren
+      L #_stFifo.stState.iRdPtr;
+      L #_iObjSize;
+      ITD;
+      *D;
+      SLD 3;// Bringe Ergebnis auf Zeiger-Format
+      +AR2;// Zeiger addieren => Neuer Offset für Kopierschleife
+      L #_iObjSize;
+j081:      T #_iObjSize;
+      AUF DB[ #_iDB_Buffer];
+      L B[ AR2, P#0.0];
+      AUF DB[ #_iDB_Obj];
+      T B[ AR1, P#0.0];
+      +AR1 P#1.0;
+      +AR2 P#1.0;
+      L #_iObjSize;
+      LOOP j081;
+// Schreibzeiger inkrementieren
+      L 1;
+      L #_stFifo.stState.iRdPtr;
+      +I;
+      T #_stFifo.stState.iRdPtr;
+      L #_iPtrLimit;
+      >=I;
+// Maximale Zeigergrösse erreicht ?
+      SPBN j082;
+      L 0;
+      T #_stFifo.stState.iRdPtr;
+j082:      L #_stFifo.diPtr;// Zeiger der Instanzdaten setzen
+      LAR1;
+      AUF DB[ #_stFifo.iDB];
+// Speichere aktuellen Lesezeiger
+      L #_stFifo.stState.iRdPtr;
+      T W[ AR1, P#6.0];
+// FIFO ist nach Lesevorgang auf Zustand "Nicht voll" setzen
+      CLR;
+      = #_stFifo.stState.bFull;
+// FIFO ist leer, wenn Schreibzeiger == Lesezeiger ist (Nach aktiver Leseoperation)
+      L #_stFifo.stState.iRdPtr;
+      L #_stFifo.stState.iWrPtr;
+      ==I;
+      = #_stFifo.stState.bEmpty;
+
+
+NETWORK
+TITLE = Zustand "Initialiserung"
+// Initialisierung Durchführen, bei gesetztem Init-Befehl über das Input-Interface
+j090:      U #_stFifo.stInput.bInit;
+      O "__RUN_UP";// bei CPU - Neustart
+      ON #_stFifo.stState.bFirstRun;// bei Reinitialisierung der Datenstruktur
+      SPBN j091;
+      L #_stFifo.diPtr;// Zeiger der Instanzdaten setzen
+      LAR1;
+      AUF DB[ #_stFifo.iDB];
+      L 0;
+      T W[ AR1, P#6.0];// Lesezeiger auf Null initialisieren
+      T W[ AR1, P#8.0];// Schreibzeiger auf Null initialisieren
+      SET;
+      = #_stFifo.stState.bEmpty;// Setze den Zustand des FIFO auf Status "Leer"
+      = #_stFifo.stState.bInit;// Setze Status Initialisierung aktiv
+      = #_stFifo.stState.bFirstRun;// Setze erster Zyklus durchlaufen
+      CLR;
+      = #_stFifo.stState.bFull;// Zurücksetzen von Zustand "Voll"
+      SPA j100;
+j091:      CLR;
+      = #_stFifo.stState.bInit;// Status "Initialisierung" zurücksetzen
+
+
+
+NETWORK
+TITLE = Status Aktualisieren
+// Status Update
+j100:      L P##_stFifo;
+      LAR2;
+      L #_stFifo.diPtr;// Zeiger der Instanzdaten setzen
+      LAR1;
+      AUF DB[ #_stFifo.iDB];
+      L W[ AR2, P#8.0];
+      T W[ AR1, P#4.0];
+      L B[ AR1, P#4.0];
+      T B[ AR1, P#2.0];
+
+
+NETWORK
+TITLE = 
+      L 0;// Kein Fehler
+// Prüfe ob eine Schreiboperation bei vollem Buffer durchgeführt wird
+      U #_stFifo.stInput.bWrite;
+      U #_stFifo.stState.bFull;
+      SPBN j110;
+      L 8002;// Fehler => Schreiben in vollen Buffer
+      SPA j111;
+// Prüfe ob ein Lesezugriff bei leerem Buffer erfolgt
+j110:      U #_stFifo.stInput.bRead;
+      U #_stFifo.stState.bEmpty;
+      SPBN j111;
+      L 8002;// Fehler => Lesen von leerem Buffer
+j111:      T #fifo;
+      LAR2 #_dwSaveAR2;// Adressregister 2 wiederherstellen
+      BE;
+END_FUNCTION
+
