@@ -6,12 +6,12 @@ VERSION : 0.1
 
 
   STRUCT 	
-   stInput : STRUCT 	//Eingänge
-    bRestart : BOOL ;	//Zurücksetzen
+   stInput : STRUCT 	//EingÃ¤nge
+    bRestart : BOOL ;	//ZurÃ¼cksetzen
     bMan : BOOL ;	//Betriebsart "Hand" einschalten
     bAut : BOOL ;	//Betriebsart "Automatik" einschalten
     bMCS : BOOL ;	//Motorschutzschalter
-    bFB : BOOL ;	//Rückmeldung Schütz, FU
+    bFB : BOOL ;	//RÃ¼ckmeldung SchÃ¼tz, FU
     bReserve_0 : BOOL ;	//Reserve
     bExtFlt : BOOL ;	//Externer Fehler
     bLock : BOOL ;	//Verriegelung aktiv
@@ -24,7 +24,7 @@ VERSION : 0.1
     bReserve_2 : BOOL ;	//Reserve
     bReserve_3 : BOOL ;	//Reserve
    END_STRUCT ;	
-   stOutput : STRUCT 	//Ausgänge
+   stOutput : STRUCT 	//AusgÃ¤nge
     bMan : BOOL ;	//Betriebsart "Hand" aktiv
     bAut : BOOL ;	//Betriebsart "Automatik" aktiv
     bStart : BOOL ;	//Motor starten
@@ -40,15 +40,15 @@ VERSION : 0.1
     bReserve_3 : BOOL ;	//Reserve
     bReserve_4 : BOOL ;	//Reserve
     bReserve_5 : BOOL ;	//Reserve
-    bFlt : BOOL ;	//Motor Sammelstörung
+    bFlt : BOOL ;	//Motor SammelstÃ¶rung
    END_STRUCT ;	
    stParam : STRUCT 	//Parameter
-    bEnMCS : BOOL ;	//Motorschutzüberwachung aktivieren
-    bEnFB : BOOL ;	//Rückmeldung aktivieren
+    bEnMCS : BOOL ;	//MotorschutzÃ¼berwachung aktivieren
+    bEnFB : BOOL ;	//RÃ¼ckmeldung aktivieren
     bReserve : BOOL ;	
-    bAutSwMode : BOOL ;	//Schaltermodus für Automatik (Ein / Aus mit bAutStart)
-    bManSwMode : BOOL ;	//Schaltermodus für Lokaler Betrieb (Ein / Aus mit bManStart)
-    tTimeFB : TIME ;	//Zeitüberwachung Rückmeldung 
+    bAutSwMode : BOOL ;	//Schaltermodus fÃ¼r Automatik (Ein / Aus mit bAutStart)
+    bManSwMode : BOOL ;	//Schaltermodus fÃ¼r Lokaler Betrieb (Ein / Aus mit bManStart)
+    tTimeFB : TIME ;	//ZeitÃ¼berwachung RÃ¼ckmeldung 
    END_STRUCT ;	
    stPrivate : STRUCT 	//Private Instanzdaten
     bStart : BOOL ;	
@@ -61,7 +61,7 @@ VERSION : 0.1
     bTonStartPre : BOOL ;	
     bFltPre : BOOL ;	
     diTicksPre : DINT ;	
-    tTimePast : TIME ;	//Vergangene Zeit Rückmeldung (Zur Beobachtung)
+    tTimePast : TIME ;	//Vergangene Zeit RÃ¼ckmeldung (Zur Beobachtung)
    END_STRUCT ;	
   END_STRUCT ;	
 END_TYPE
@@ -87,14 +87,14 @@ VAR_TEMP
 END_VAR
 BEGIN
 NETWORK
-TITLE =Umkopieren der Eingänge
+TITLE =Umkopieren der EingÃ¤nge
 
       SET   ; 
 
 //Adressregister 2 sichern
       TAR2  #dwTemp; 
 
-// DB indirekt öffnen
+// DB indirekt Ã¶ffnen
       L     P##MOT_TYPE; 
       LAR1  ; 
       L     W [AR1,P#0.0]; 
@@ -104,7 +104,7 @@ TITLE =Umkopieren der Eingänge
       AUF   DB [#wTemp]; 
       L     P##stTempMot; 
       LAR2  ; 
-// Eingänge
+// EingÃ¤nge
       L     DBW [AR1,P#0.0]; 
       T     LW [AR2,P#0.0]; 
 
@@ -118,13 +118,13 @@ TITLE =Umkopieren der Eingänge
 
 
 NETWORK
-TITLE =Neuerstart - Rücksetzen aller Statischen Variablen
+TITLE =Neuerstart - RÃ¼cksetzen aller Statischen Variablen
 
       U     #stTempMot.stInput.bRestart; 
       O     "RunUp"; 
       SPBN  j001; 
       L     0; 
-// Ausgänge    
+// AusgÃ¤nge    
       T     DBW [AR1,P#2.0]; 
 // Instanzdaten
       T     DBW [AR1,P#10.0]; 
@@ -132,25 +132,25 @@ TITLE =Neuerstart - Rücksetzen aller Statischen Variablen
 
 NETWORK
 TITLE =Hand / Auto - Modus 
-// Wenn beide Eingänge gesetzt, dann ist der Hand - Modus aktiv
+// Wenn beide EingÃ¤nge gesetzt, dann ist der Hand - Modus aktiv
 // Setzen OpMode (Hand / Automatik - Betrieb)
 j001: U     #stTempMot.stInput.bAut; 
       O     #stTempMot.stPrivate.bOpMode; 
       UN    #stTempMot.stInput.bMan; 
       =     #stTempMot.stPrivate.bOpMode; 
 
-// Verknüpfung Modus Automatik
+// VerknÃ¼pfung Modus Automatik
       U     #stTempMot.stPrivate.bOpMode; 
       =     #stTempMot.stOutput.bAut; 
 
-// Verknüpfung Modus Manuel
+// VerknÃ¼pfung Modus Manuel
       UN    #stTempMot.stPrivate.bOpMode; 
       =     #stTempMot.stOutput.bMan; 
 
 NETWORK
 TITLE =Motor Zustand setzen
 
-// Rückmeldung Schütz
+// RÃ¼ckmeldung SchÃ¼tz
       U     #stTempMot.stParam.bEnFB; 
       U     #stTempMot.stInput.bFB; 
       O(    ; 
@@ -160,12 +160,12 @@ TITLE =Motor Zustand setzen
       =     #stTempMot.stInput.bFB; 
 
 
-//Rückmeldung Motor "Ein"
+//RÃ¼ckmeldung Motor "Ein"
       U     #stTempMot.stPrivate.bStart; 
       U     #stTempMot.stInput.bFB; 
       =     #stTempMot.stOutput.bRun; 
 
-// Rückmeldung Motor "Aus"
+// RÃ¼ckmeldung Motor "Aus"
       UN    #stTempMot.stPrivate.bStart; 
       UN    #stTempMot.stInput.bFB; 
       =     #stTempMot.stOutput.bStop; 
@@ -184,12 +184,12 @@ TITLE =Motor Zustand setzen
       U     #stTempMot.stInput.bExtFlt; 
       =     #stTempMot.stOutput.bFltExtFlt; 
 
-// Rückmeldefehler
+// RÃ¼ckmeldefehler
       U     #stTempMot.stPrivate.bFbFlt; 
       =     #stTempMot.stOutput.bFltFB; 
 
 NETWORK
-TITLE =Fehler setzen / rücksetzen
+TITLE =Fehler setzen / rÃ¼cksetzen
 
 // Flankenerkennung
       U     #stTempMot.stInput.bAck; 
@@ -201,7 +201,7 @@ TITLE =Fehler setzen / rücksetzen
       =     #bTempManStartFp; 
 
 
-// Fehler Rücksetzen mit Quittiertaste
+// Fehler RÃ¼cksetzen mit Quittiertaste
       U     #bTemp; 
 // oder im Modus "Hand" bei Schalterstellung "Aus"
       O(    ; 
@@ -212,7 +212,7 @@ TITLE =Fehler setzen / rücksetzen
       =     #bTemp; 
       R     #stTempMot.stPrivate.bFlt; 
 
-// Rückmeldefehler zurücksetzen
+// RÃ¼ckmeldefehler zurÃ¼cksetzen
       UN    #stTempMot.stParam.bEnFB; 
       O     #bTemp; 
       R     #stTempMot.stPrivate.bFbFlt; 
@@ -234,7 +234,7 @@ TITLE =Fehler setzen / rücksetzen
 
 
 NETWORK
-TITLE =Startbefehl für Motor setzen
+TITLE =Startbefehl fÃ¼r Motor setzen
 
 // Setzen
       U     #stTempMot.stOutput.bAut; 
@@ -250,7 +250,7 @@ TITLE =Startbefehl für Motor setzen
 // bStart
       S     #stTempMot.stPrivate.bStart; 
 
-// Rücksetzen
+// RÃ¼cksetzen
       U     #stTempMot.stPrivate.bFlt; 
       O     #stTempMot.stOutput.bLock; 
       O(    ; 
@@ -279,7 +279,7 @@ TITLE =Startbefehl für Motor setzen
       R     #stTempMot.stPrivate.bStart; 
 
 NETWORK
-TITLE =Rückmeldung (Schütz, FU) Einschalten / Ausschalten
+TITLE =RÃ¼ckmeldung (SchÃ¼tz, FU) Einschalten / Ausschalten
 // Laufzeit starten
 
       X     #stTempMot.stPrivate.bStart; 
@@ -329,7 +329,7 @@ j003: UN    #bTonStart;
       =     #stTempMot.stPrivate.bTonStartPre; 
 
 NETWORK
-TITLE =Ausgänge setzen
+TITLE =AusgÃ¤nge setzen
 
 // Motor Startbefehl 
       U     #stTempMot.stPrivate.bStart; 
@@ -343,7 +343,7 @@ TITLE =Ausgänge setzen
       =     #stTempMot.stOutput.bReserve_4; 
       =     #stTempMot.stOutput.bReserve_5; 
 
-// Daten auf Ausgänge übernehmen
+// Daten auf AusgÃ¤nge Ã¼bernehmen
       L     LW [AR2,P#2.0]; 
       T     DBW [AR1,P#2.0]; 
 
