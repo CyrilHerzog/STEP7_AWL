@@ -1,6 +1,6 @@
 FUNCTION "iMUX_2x1" : INT
 TITLE =iMUX_2x1
-//Multiplexer für zwei Eingangswerte vom Typ Integer
+//Multiplexer fÃ¼r zwei Eingangswerte vom Typ Integer
 AUTHOR : HECY
 FAMILY : BIS_BA
 NAME : iMUX_2x1
