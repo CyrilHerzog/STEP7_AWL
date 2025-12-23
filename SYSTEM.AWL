@@ -6,10 +6,10 @@ VERSION : 0.1
 
 
   STRUCT 	
-   stInput : STRUCT 	//Eingänge
+   stInput : STRUCT 	//EingÃ¤nge
     bRes : BOOL ;	//Reserve
    END_STRUCT ;	
-   stOutput : STRUCT 	//Ausgänge
+   stOutput : STRUCT 	//AusgÃ¤nge
     bWDT : BOOL ;	//WatchDog 2s Pulse
     bBatFlt : BOOL ;	//Batteriefehler SPS
    END_STRUCT ;	
@@ -25,7 +25,7 @@ END_TYPE
 
 FUNCTION "SYSTEM" : VOID
 TITLE =SYSTEM
-//Bildet Werte für folgene Variablen:
+//Bildet Werte fÃ¼r folgene Variablen:
 //- SysTick                     => Merker muss in Symboltabelle definiert werden!
 //- RunUp                       => Merker muss in Symboltabelle definiert werden!
 //- True                        => Merker muss in Symboltabelle definiert werden!
@@ -89,7 +89,7 @@ TITLE =Systeminformationen lesen => Welcher OB ist aktiv
 
 
 NETWORK
-TITLE =Datenbaustein indirekt öffnen
+TITLE =Datenbaustein indirekt Ã¶ffnen
 
       L     P##SYS_TYPE; 
       LAR1  ; 
@@ -102,7 +102,7 @@ TITLE =Datenbaustein indirekt öffnen
 
 
 NETWORK
-TITLE =Programm für den aktuellen OB selektieren
+TITLE =Programm fÃ¼r den aktuellen OB selektieren
 
       L     1; 
       L     #stTopSI.byNum; 
@@ -211,7 +211,7 @@ TITLE =OB 100 - Restart
 j100: SET   ; 
       S     "RunUp"; 
 
-// Reset Systemzähler (SysTick)
+// Reset SystemzÃ¤hler (SysTick)
       L     L#0; 
       T     DBD [AR1,P#12.0]; 
       BE    ; 
