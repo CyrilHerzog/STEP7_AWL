@@ -1,4 +1,4 @@
-TYPE "PIDT1_TYPE"
+TYPE "PIDT1_T"
 AUTHOR : HECY
 FAMILY : BIS_BA
 NAME : PID_TYPE
@@ -6,14 +6,14 @@ VERSION : 0.1
 
 
   STRUCT 	
-   stInput : STRUCT 	//Eingänge
+   i_stControl : STRUCT 	//Eingänge
     bReset : BOOL ;	//Zurücksetzen
     bMan : BOOL ;	//Hand Ein / Aus
     iActVal : INT ;	//Istwert
     iSetVal : INT ;	//Sollwert
     iManVal : INT ;	//Handwert
    END_STRUCT ;	
-   stOutput : STRUCT 	//Ausgänge
+   o_stState : STRUCT 	//Ausgänge
     bHiLim : BOOL ;	//Anti-Windup Hoch aktiv
     bLoLim : BOOL ;	//Anti-Windup Tief aktiv
     iY : INT ;	//Stellwert Integerform
@@ -22,7 +22,7 @@ VERSION : 0.1
     rYD : REAL ;	//Differentialanteil
     iError : INT ;	//Regelabweichung
    END_STRUCT ;	
-   stParam : STRUCT 	//Parameter
+   i_stParam : STRUCT 	//Parameter
     iDeathband : INT ;	//Totband
     iLimLo : INT ;	//Begrenzung Min
     iLimHi : INT ;	//Begrenzung Max
@@ -38,6 +38,7 @@ END_TYPE
 
 FUNCTION "PIDT1" : VOID
 TITLE =PIDT1
+//Autor: Herzog Cyril, BIS_BA
 AUTHOR : HECY
 FAMILY : BIS_BA
 NAME : PIDT1
@@ -45,7 +46,7 @@ VERSION : 0.1
 
 
 VAR_IN_OUT
-  PIDT1_TYPE : "PIDT1_TYPE";	
+  pInstance : "PIDT1_T";	
 END_VAR
 VAR_TEMP
   bEnI : BOOL ;	
@@ -64,14 +65,14 @@ VAR_TEMP
   rYp : REAL ;	
   rI : REAL ;	
   rD : REAL ;	
+  bInvert : BOOL ;	
 END_VAR
 BEGIN
 NETWORK
 TITLE =Reset / Manuel Mode / Parameter DB
 
-
       SET   ; 
-      L     P##PIDT1_TYPE; 
+      L     P##pInstance; 
       LAR1  ; 
       L     W [AR1,P#0.0]; 
       T     #iTemp; 
@@ -80,7 +81,7 @@ TITLE =Reset / Manuel Mode / Parameter DB
       AUF   DB [#iTemp]; 
 // bReset
       U     DBX [AR1,P#0.0]; 
-      O     "RunUp"; 
+      O     "__SYS_RUN_UP"; 
       SPBN  j001; 
       L     0; 
 // iY
@@ -131,7 +132,6 @@ j001: CLR   ;
 
 NETWORK
 TITLE =Regelabweichung bestimmen
-
 // iDeathband
       L     DBW [AR1,P#26.0]; 
       T     #iTemp; 
@@ -152,14 +152,12 @@ j010: L     #iTemp;
 j011: L     #iError; 
       L     0; 
       >I    ; 
-      =     #bErrPos; 
       SPBN  j012; 
       L     #iError; 
       L     #iTemp; 
       -I    ; 
       SPA   j013; 
 j012: <I    ; 
-      =     #bErrNeg; 
       SPBN  j013; 
       L     #iError; 
       L     #iTemp; 
@@ -183,11 +181,24 @@ j020: T     #rKp;
       L     #iError; 
       ITD   ; 
       DTR   ; 
+      T     #rTemp; 
       *R    ; 
 j021: T     #rYp; 
 //rYP
       T     DBD [AR1,P#12.0]; 
 
+NETWORK
+TITLE =Positiver / Negativer Regelfehler in Abhängigkeit von Kp (AWU)
+
+      L     #rTemp; 
+      L     #rKp; 
+      *R    ; 
+      L     0.000000e+000; 
+      >R    ; 
+      =     #bErrPos; 
+      <R    ; 
+      =     #bErrNeg; 
+      SET   ; 
 
 NETWORK
 TITLE =I - Anteil berechnen (Trapezintegration)
@@ -273,7 +284,6 @@ j040: L     0.000000e+000;
 
 NETWORK
 TITLE =Komponenten Addieren / Vorsteuerung / Handbetrieb
-
 // bMan
 j050: U     DBX [AR1,P#0.1]; 
       SPBN  j051; 
@@ -304,26 +314,20 @@ TITLE =Begrenzung / Anti Windup Massnahme
       L     DBW [AR1,P#30.0]; 
       ITD   ; 
       >D    ; 
+      =     DBX [AR1,P#8.0]; 
       SPBN  j060; 
 // bHiLim
-      S     DBX [AR1,P#8.0]; 
       T     #diTemp; 
-      SPA   j062; 
 j060: TAK   ; 
 // iLimLo
       L     DBW [AR1,P#28.0]; 
       ITD   ; 
       <D    ; 
+      =     DBX [AR1,P#8.1]; 
       SPBN  j061; 
 // bLoLim
-      S     DBX [AR1,P#8.1]; 
       T     #diTemp; 
-      SPA   j062; 
-// bHiLim
-j061: R     DBX [AR1,P#8.0]; 
-// bLoLim
-      R     DBX [AR1,P#8.1]; 
-j062: L     #diTemp; 
+j061: L     #diTemp; 
 // iY
       T     DBW [AR1,P#10.0]; 
 

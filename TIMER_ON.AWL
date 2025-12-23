@@ -1,0 +1,145 @@
+TYPE "TIMER_T"
+AUTHOR : HECY
+VERSION : 0.1
+
+
+  STRUCT 	
+   stParam : STRUCT 	
+    tTime : TIME ;	
+   END_STRUCT ;	
+   tPast : TIME ;	//past time for monitoring
+   stPrivate : STRUCT 	
+    bFlagMem : BOOL ;	//save last state of input
+    bReached : BOOL ;	//time reached
+    diTicksPre : DINT ;	//save current ticks
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "TIMER_ON" : WORD
+TITLE = TIMER_ON
+//V1.0
+//29.06.2023
+//Herzog Cyril
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : TIM_ON
+VERSION : 0.1
+
+
+VAR_INPUT
+  bIn : BOOL ;	
+END_VAR
+VAR_OUTPUT
+  bQ : BOOL ;	
+END_VAR
+VAR_IN_OUT
+  pInstance : "TIMER_T";	
+END_VAR
+VAR_TEMP
+  _dwSaveAR2 : DWORD ;	
+  _stInstance : STRUCT 	
+   iDB : INT ;	
+   stState : STRUCT 	
+    bInPre : BOOL ;	
+    bReached : BOOL ;	
+    bActive : BOOL ;	
+    tPast : TIME ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE = 
+
+      SET   ; 
+
+
+NETWORK
+TITLE =
+
+      L     P##pInstance; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #_stInstance.iDB; 
+      L     0; 
+      ==I   ; 
+      SPBN  j020; 
+      L     W#16#8004; 
+      T     #RET_VAL; 
+      BEA   ; 
+j020: L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      TAR2  #_dwSaveAR2; 
+      LAR2  P##_stInstance; 
+      AUF   DB [#_stInstance.iDB]; 
+      L     DBW [AR1,P#8.0]; 
+      T     LW [AR2,P#2.0]; 
+NETWORK
+TITLE =
+
+      L     DBD [AR1,P#4.0]; 
+      UN    #_stInstance.stState.bActive; 
+      SPBN  j030; 
+      L     L#0; 
+j030: T     #_stInstance.stState.tPast; 
+
+
+
+NETWORK
+TITLE =
+
+      U     #bIn; 
+      FP    #_stInstance.stState.bInPre; 
+      S     #_stInstance.stState.bActive; 
+      SPBN  j001; 
+      L     "__SYS_TICK"; 
+      T     DBD [AR1,P#10.0]; 
+j001: U     #_stInstance.stState.bInPre; 
+      UN    #_stInstance.stState.bReached; 
+      SPBN  j002; 
+// if ((current_ticks - ticks_pre >= time_para) {...
+      L     "__SYS_TICK"; 
+      L     DBD [AR1,P#10.0]; // previous ticks
+      -D    ; 
+      T     #_stInstance.stState.tPast; // past time
+      L     DBD [AR1,P#0.0]; // time param
+      >=D   ; 
+      =     #_stInstance.stState.bReached; 
+      R     #_stInstance.stState.bActive; 
+j002: UN    #_stInstance.stState.bInPre; 
+      R     #_stInstance.stState.bReached; 
+      R     #_stInstance.stState.bActive; 
+
+NETWORK
+TITLE =
+
+      L     LW [AR2,P#2.0]; 
+      T     DBW [AR1,P#8.0]; 
+      LAR2  #_dwSaveAR2; 
+
+
+NETWORK
+TITLE =
+
+      L     #_stInstance.stState.tPast; 
+      U     #_stInstance.stState.bActive; 
+      SPBN  j060; 
+      L     DBD [AR1,P#0.0]; 
+      TAK   ; 
+      -D    ; 
+j060: T     DBD [AR1,P#4.0]; 
+
+
+NETWORK
+TITLE =
+
+      U     #_stInstance.stState.bReached; 
+      =     #bQ; 
+      L     0; 
+      T     #RET_VAL; 
+      BE    ; 
+
+
+END_FUNCTION
+

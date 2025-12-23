@@ -1,0 +1,361 @@
+TYPE "ANALOG_READ_CHANNEL_T"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : AI_CH_T
+VERSION : 0.1
+
+
+  STRUCT 	
+   i_wPeri : WORD ;	// Processwert (PEW / EW)
+   i_stParam : STRUCT 	// Simulation einschalten
+    bEnSim : BOOL ;	//Simulation einschalten
+    bEnFilter : BOOL ;	// Filter zuschalten
+    bEnHoldLastVal : BOOL ;	// Fehlerfall => true = letzter gültiger Wert halten / false = Ersatzwert
+    iSimVal : INT ;	// Simulationswert (Processwert 20mA = 27648)
+    stScale : STRUCT 	// Eingangswert skalieren
+     iHigh : INT ;	// Maximaler Wertebereich
+     iLow : INT ;	// Minimaler Wertebereich
+    END_STRUCT ;	
+    iSubsVal : INT ;	// Ersatzwert bei Drahtbruch / Kurzschluss, wenn bEnHoldLastVal = false
+    tFilter : TIME ;	// Filterkonstante (z.B T#5s)
+   END_STRUCT ;	
+   o_stState : STRUCT 	
+    iValue : INT ;	// Skalierter Ausgangswert
+    bFlt : BOOL ;	// Summenfehler
+    bPvLimHi : BOOL ;	// Überstrom > 21mA
+    bPvLimLo : BOOL ;	// Drahtbruch < 3,6mA
+    bSim : BOOL ;	// Simulation aktiv
+    stScale : STRUCT 	// Skalierung für Weiterverschaltung
+     iHigh : INT ;	
+     iLow : INT ;	
+    END_STRUCT ;	
+   END_STRUCT ;	
+   stInstance : STRUCT 	// Instanzdaten (Privat) 
+    rPT1 : REAL ;	
+    iLastValidVal : REAL ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "ANALOG_THRESHOLD_SWITCH" : WORD
+TITLE =
+//Autor     : Herzog Cyril
+//Version   : V1.0
+//Datum     : 23.10.25
+//
+//Funktion: Bearbeiten mehrerer Schalterinstanzen innerhalb einer Struktur 
+//(Automatische Erkennung mittels ANY - Zeigerauswertung.
+//
+//Bei akivierter Schalterinstanz wird jeweils:
+//- Schaltpunkt (Threshold) begrenzt innerhalb der Skalierung des Analog Kanals.
+//- Hysterese begrenzt und korrigiert innerhalb zulässigem Bereich:
+//      MAX: Schaltpunkt - Hysterese >= 0
+//      MIN: Schaltpunkt + Hysterese <= Max Skalierung Kanal
+//
+//Weitere Zusätze:
+//- Schaltausgang mit Parametrierbare Verzögerung 0 - 255 Sekunden
+//- Aktiv / Passiv Wirkungsrichtung
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : AI_CH_SW
+VERSION : 0.1
+
+
+VAR_IN_OUT
+  pChannel : "ANALOG_READ_CHANNEL_T";	
+  pInstances : ANY ;	
+END_VAR
+VAR_TEMP
+  _dwSaveAR2 : DWORD ;	
+  _iTemp : INT ;	
+  _bTemp : BOOL ;	
+  _iSecCycles : INT ;	
+  _iLoopCount : INT ;	
+  _stChannel : STRUCT 	
+   iValue : INT ;	// Skalierter Ausgangswert
+   bFlt : BOOL ;	// Summenfehler
+   bPvLimHi : BOOL ;	// Überstrom
+   bPvLimLo : BOOL ;	// Drahtbruch
+   bSim : BOOL ;	// Simulation aktiv
+   stScale : STRUCT 	// Skalierung für Weiterverschaltung
+    iHigh : INT ;	
+    iLow : INT ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+  _stInstance : STRUCT 	
+   iDB : INT ;	
+   iCount : INT ;	
+   stParam : STRUCT 	
+    bEnable : BOOL ;	
+    bMinMax : BOOL ;	
+    bActivePassive : BOOL ;	
+    bReserve : BOOL ;	
+    byDelay : BYTE ;	
+    iThreshold : INT ;	
+    iHysteresis : INT ;	
+   END_STRUCT ;	
+   stState : STRUCT 	
+    bQ : BOOL ;	
+    bQDly : BOOL ;	
+    byDelay : BYTE ;	
+   END_STRUCT ;	
+   stPrivate : STRUCT 	
+    iCycle : INT ;	
+    bQ : BOOL ;	
+    bQDly : BOOL ;	
+    bQPre : BOOL ;	
+    bMinMaxPre : BOOL ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      SET   ; 
+      TAR2  #_dwSaveAR2; // Adressregister 2 sichern
+
+      L     1000; 
+      L     "__SYS_OB35_TASK_TIME"; 
+      /I    ; 
+      T     #_iSecCycles; // Anzahl notwendige Zyklen für eine Sekunde
+      SRD   16; 
+      L     0; 
+      ==I   ; // Taskzeit des OB35 ist ein vielfaches von 1 Sekunde
+      =     #_bTemp; 
+      L     #_iSecCycles; 
+      L     128; // Eingestellte Taskzeit >= 7.8ms
+      >I    ; 
+      O     #_bTemp; 
+      SPB   j010; 
+      L     W#16#8002; // Systemfehler => Konfigurierte Taskzeit unzulässig
+      T     #RET_VAL; 
+      BEA   ; 
+NETWORK
+TITLE =Laden der Kanaldaten  (stState...)
+
+j010: L     P##pChannel; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #_iTemp; 
+      L     0; 
+      ==I   ; 
+      SPBN  j020; 
+      L     W#16#8004; // Fehler => Parameter im falschen Speicherbereich
+      T     #RET_VAL; 
+      BEA   ; 
+j020: L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      AUF   DB [#_iTemp]; 
+      L     DBW [AR1,P#16.0]; // Analogwert
+      T     #_stChannel.iValue; 
+      L     DBW [AR1,P#20.0]; // Maximalwert (Skalierung)
+      T     #_stChannel.stScale.iHigh; 
+      L     DBW [AR1,P#22.0]; // Minimalwert (Skalierung)
+      T     #_stChannel.stScale.iLow; 
+      U     DBX [AR1,P#2.0]; // Kanalfehler
+      =     #_stChannel.bFlt; 
+
+NETWORK
+TITLE =Prüfen der Schalter - Instanzen
+
+      L     P##pInstances; 
+      LAR1  ; 
+      L     B [AR1,P#1.0]; // Datentyp
+      L     2; 
+      ==I   ; 
+      =     #_bTemp; // Basistyp ist "Byte"
+      L     W [AR1,P#4.0]; // Datenbausteinnummer
+      T     #_stInstance.iDB; 
+      L     0; 
+      ==I   ; // Struktur in einem Datenbaustein ?
+      SPBN  j030; 
+      L     W#16#8004; // Fehler => Parameter im falschen Speicherbereich
+      T     #RET_VAL; 
+      BEA   ; 
+j030: L     W [AR1,P#2.0]; // Widerholungsfaktor => Länge in Bytes 
+      L     12; // Basisstruktur benötigt 12 Bytes
+      /I    ; 
+      T     #_stInstance.iCount; // Anzahl Schalterinstancen
+      SRD   16; // Modulo erhalten
+      L     0; 
+      ==I   ; 
+      U     #_bTemp; 
+      SPB   j031; 
+      L     W#16#8008; // Parameter ungültig => Verschaltungsfehler im Strukturaufbau
+      T     #RET_VAL; 
+      BEA   ; 
+j031: L     D [AR1,P#6.0]; 
+      LAR1  ; // Zeiger auf Daten
+      LAR2  P##_stInstance; // Zeiger auf Temporärdaten
+      AUF   DB [#_stInstance.iDB]; // Datenbaustein mit Instanzen öffnen
+
+
+
+NETWORK
+TITLE =Wiederholung für jede Schalterinstanz
+
+      L     #_stInstance.iCount; 
+j040: T     #_iLoopCount; 
+      L     DBW [AR1,P#0.0]; // i_stParam
+      T     LW [AR2,P#4.0]; // _stInstances.stParam
+      U     #_stInstance.stParam.bEnable; 
+      SPB   j041; 
+      L     W#16#0; 
+      T     LW [AR2,P#14.0]; 
+      SPA   j081; 
+j041: L     DBW [AR1,P#8.0]; 
+      T     #_stInstance.stPrivate.iCycle; 
+      L     DBW [AR1,P#2.0]; // Schwellwert (Unlimitiert)
+      T     #_stInstance.stParam.iThreshold; 
+      L     DBW [AR1,P#4.0]; // Hysterese
+      T     #_stInstance.stParam.iHysteresis; 
+      L     DBW [AR1,P#10.0]; // stPrivate
+      T     LW [AR2,P#14.0]; // _stInstance.stPrivate
+      X     #_stInstance.stParam.bMinMax; 
+      X     #_stInstance.stPrivate.bMinMaxPre; 
+      SPBN  j042; 
+      R     #_stInstance.stPrivate.bQ; // Ausgang Rücksetzen bei Parameterwechsel (MinMax)
+j042: U     #_stInstance.stParam.bMinMax; 
+      =     #_stInstance.stPrivate.bMinMaxPre; 
+NETWORK
+TITLE =Bereichsgrenze für Schwellwert auf Skalierung begrenzen
+
+      L     #_stInstance.stParam.iThreshold; 
+      L     #_stChannel.stScale.iHigh; 
+      <I    ; 
+      SPB   j051; 
+      T     #_stInstance.stParam.iThreshold; 
+j051: TAK   ; 
+      L     #_stChannel.stScale.iLow; 
+      >I    ; 
+      SPB   j052; 
+      T     #_stInstance.stParam.iThreshold; 
+j052: L     #_stInstance.stParam.iThreshold; 
+      T     DBW [AR1,P#2.0]; // Schwellwert (Limitiert)
+
+
+
+NETWORK
+TITLE =Grenzwertschalter mit Hysterese
+
+      L     #_stInstance.stParam.iHysteresis; 
+      NEGI  ; 
+      SPPZ  j060; 
+      NEGI  ; 
+j060: T     #_stInstance.stParam.iHysteresis; // Hysterese (Absolutwert)
+      U     #_stInstance.stParam.bMinMax; // False = Max / True = Min
+      SPB   j061; 
+      -I    ; // Grenzwert - ABS(Hysterese)
+      SPPZ  j062; 
+      L     #_stInstance.stParam.iHysteresis; 
+      +I    ; 
+      T     #_stInstance.stParam.iHysteresis; 
+      L     0; 
+j062: L     #_stChannel.iValue; 
+      >=I   ; 
+      R     #_stInstance.stPrivate.bQ; 
+      L     #_stInstance.stParam.iThreshold; 
+      >=I   ; 
+      S     #_stInstance.stPrivate.bQ; 
+      SPA   j070; 
+j061: +I    ; 
+      T     #_iTemp; 
+      L     #_stChannel.stScale.iHigh; 
+      <I    ; 
+      SPB   j063; 
+      T     #_iTemp; 
+      L     #_stInstance.stParam.iThreshold; 
+      -I    ; // Max-Skalierung - Schaltpunkt
+      T     #_stInstance.stParam.iHysteresis; 
+      TAK   ; 
+j063: L     #_iTemp; 
+      L     #_stChannel.iValue; 
+      <=I   ; 
+      R     #_stInstance.stPrivate.bQ; 
+      L     #_stInstance.stParam.iThreshold; 
+      <=I   ; 
+      S     #_stInstance.stPrivate.bQ; 
+
+
+NETWORK
+TITLE =
+
+j070: CLR   ; 
+      =     #_stInstance.stPrivate.bQDly; 
+      U     #_stInstance.stPrivate.bQ; 
+      SPB   j071; 
+      L     #_stInstance.stParam.byDelay; 
+      L     #_iSecCycles; 
+      *I    ; 
+      T     #_stInstance.stPrivate.iCycle; 
+      SPA   j080; 
+j071: L     0; 
+      L     #_stInstance.stPrivate.iCycle; 
+      ==I   ; 
+      =     #_stInstance.stPrivate.bQDly; 
+      SPB   j072; 
+      L     L#1; 
+      -I    ; 
+j072: T     #_stInstance.stPrivate.iCycle; 
+
+
+      L     #_stInstance.stParam.iHysteresis; 
+      T     DBW [AR1,P#4.0]; // Hysterese
+      L     #_stInstance.stPrivate.iCycle; 
+      T     DBW [AR1,P#8.0]; 
+
+
+
+NETWORK
+TITLE =Ausgänge schreiben
+
+j080: L     LW [AR2,P#14.0]; // _stInstance.stPrivate
+j081: T     DBW [AR1,P#10.0]; // private
+
+
+
+      L     0; 
+      T     LW [AR2,P#10.0]; // Initial
+      X     #_stInstance.stPrivate.bQ; 
+      X     #_stInstance.stParam.bActivePassive; 
+      =     #_stInstance.stState.bQ; 
+
+      X     #_stInstance.stPrivate.bQDly; 
+      X     #_stInstance.stParam.bActivePassive; 
+      =     #_stInstance.stState.bQDly; 
+
+      L     B#16#0; 
+      U     #_stInstance.stState.bQDly; 
+      SPBN  j082; 
+      L     #_stInstance.stPrivate.iCycle; 
+      L     #_iSecCycles; 
+      /I    ; 
+j082: T     #_stInstance.stState.byDelay; 
+
+
+      L     LW [AR2,P#10.0]; 
+      T     DBW [AR1,P#6.0]; // o_state
+
+
+NETWORK
+TITLE =Adresszeiger auf nächste Instanz erhöhen
+
+      +AR1  P#12.0; 
+      L     #_iLoopCount; 
+      LOOP  j040; 
+
+
+
+NETWORK
+TITLE =
+
+      LAR2  #_dwSaveAR2; // Adressregister 2 wiederherstellen
+      L     #_stInstance.iCount; // Anzahl verfügbarer Schalter
+      T     #RET_VAL; 
+      CLR   ; 
+      BE    ; 
+
+
+END_FUNCTION
+

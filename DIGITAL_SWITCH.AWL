@@ -1,0 +1,174 @@
+TYPE "DIGITAL_SWITCH_T"
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : DEB_TYPE
+VERSION : 0.1
+
+
+  STRUCT 	
+   i_stParam : STRUCT 	//Parameter
+    tTimeOn : TIME ;	
+    tTimeOff : TIME ;	
+   END_STRUCT ;	
+   stPrivate : STRUCT 	//Private Variablen (Instanz)
+    wState : WORD ;	
+    diTicksPre : DINT ;	
+   END_STRUCT ;	
+   o_stState : STRUCT 	
+    bValue : BOOL ;	
+    bValue_RT : BOOL ;	//Steigende Flanke
+    bValue_FT : BOOL ;	//Fallende Flanke
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_TYPE
+
+FUNCTION "DIGITAL_SWITCH" : WORD
+TITLE =DIGITAL_SWITCH
+//Herzog Cyril
+//18.09.2023
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : DEBOUNCE
+VERSION : 0.1
+
+
+VAR_INPUT
+  bIn : BOOL ;	
+END_VAR
+VAR_IN_OUT
+  pInstance : "DIGITAL_SWITCH_T";	
+END_VAR
+VAR_TEMP
+  _dwSaveAR2 : DWORD ;	
+  _stInstance : STRUCT 	
+   iDB : INT ;	
+   stState : STRUCT 	
+    bFilter : BOOL ;	
+    bFilter_RT : BOOL ;	
+    bFilter_FT : BOOL ;	
+    bIn : BOOL ;	
+    bInPre : BOOL ;	
+    bTon : BOOL ;	
+    bTOF : BOOL ;	
+    bFilterPre : BOOL ;	
+   END_STRUCT ;	
+  END_STRUCT ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =
+
+      SET   ; 
+
+NETWORK
+TITLE =
+
+      L     P##pInstance; 
+      LAR1  ; 
+      L     W [AR1,P#0.0]; 
+      T     #_stInstance.iDB; 
+      L     0; 
+      ==I   ; 
+      SPBN  j020; 
+      L     W#16#8004; 
+      T     #RET_VAL; 
+      BEA   ; 
+j020: L     D [AR1,P#2.0]; 
+      LAR1  ; 
+      TAR2  #_dwSaveAR2; 
+      LAR2  P##_stInstance; 
+      AUF   DB [#_stInstance.iDB]; 
+      L     DBW [AR1,P#8.0]; // stPrivate.wState
+      T     LW [AR2,P#2.0]; // _stInstance.stState
+
+
+NETWORK
+TITLE =
+
+      U     #bIn; 
+      =     #_stInstance.stState.bIn; 
+      X     #_stInstance.stState.bIn; 
+      X     #_stInstance.stState.bInPre; 
+      SPBN  j040; 
+      L     "__SYS_TICK"; 
+      T     DBD [AR1,P#10.0]; // stPrivate.diTicksPre
+
+
+NETWORK
+TITLE =
+
+j040: U     #_stInstance.stState.bIn; 
+      =     #_stInstance.stState.bInPre; 
+      UN    #_stInstance.stState.bTon; 
+      SPBN  j041; 
+      L     "__SYS_TICK"; 
+      L     DBD [AR1,P#10.0]; // diTicksPre
+      -D    ; 
+      L     DBD [AR1,P#0.0]; // tTimeOn
+      >=D   ; 
+      =     #_stInstance.stState.bTon; 
+j041: UN    #_stInstance.stState.bIn; 
+      R     #_stInstance.stState.bTon; 
+
+
+NETWORK
+TITLE =
+
+      UN    #_stInstance.stState.bIn; 
+      UN    #_stInstance.stState.bTOF; 
+      SPBN  j050; 
+      L     "__SYS_TICK"; 
+      L     DBD [AR1,P#10.0]; // diTicksPre
+      -D    ; 
+      L     DBD [AR1,P#4.0]; // tTimeOFF
+      >=D   ; 
+// bTof
+      =     #_stInstance.stState.bTOF; 
+j050: U     #_stInstance.stState.bIn; 
+      R     #_stInstance.stState.bTOF; 
+
+
+NETWORK
+TITLE =
+
+      U     #_stInstance.stState.bTon; 
+      S     #_stInstance.stState.bFilter; 
+      U     #_stInstance.stState.bTOF; 
+      R     #_stInstance.stState.bFilter; 
+
+
+
+NETWORK
+TITLE =
+
+      U     #_stInstance.stState.bFilter; 
+      UN    #_stInstance.stState.bFilterPre; 
+      =     #_stInstance.stState.bFilter_RT; 
+      UN    #_stInstance.stState.bFilter; 
+      U     #_stInstance.stState.bFilterPre; 
+      =     #_stInstance.stState.bFilter_FT; 
+      U     #_stInstance.stState.bFilter; 
+      =     #_stInstance.stState.bFilterPre; 
+
+
+
+
+NETWORK
+TITLE =
+
+      L     LW [AR2,P#2.0]; // _stInstance.stState
+      T     DBW [AR1,P#8.0]; // stPrivate.wState
+      L     W#16#700; // nur die ersten 3 Bits übernehmen
+      UW    ; 
+      T     DBW [AR1,P#14.0]; // o_stState
+NETWORK
+TITLE =
+
+      L     0; // Keine Fehler
+      T     #RET_VAL; 
+      LAR2  #_dwSaveAR2; 
+      BE    ; 
+
+
+END_FUNCTION
+

@@ -1,0 +1,161 @@
+FUNCTION "LIMIT_OBJ_IN_LIST" : WORD
+TITLE =
+//Autor: Herzog Cyril, BIS_BA
+//Datum: 18.11.2024
+AUTHOR : HECY
+FAMILY : BIS_BA
+NAME : LIM_OBJ
+VERSION : 0.1
+
+
+VAR_INPUT
+  pList : ANY ;	
+  pLimits : ANY ;	
+END_VAR
+VAR_TEMP
+  _dwSaveAR2 : DWORD ;	
+  _bTemp : BOOL ;	
+  _stList : STRUCT 	
+   iDB : INT ;	
+   iSize : INT ;	
+   iNumObj : INT ;	
+  END_STRUCT ;	
+  _stLimits : STRUCT 	
+   iDB : INT ;	
+   iSize : INT ;	
+   iMin : INT ;	
+   iMax : INT ;	
+   iRepeat : INT ;	
+   dwInitAddr : DWORD ;	
+  END_STRUCT ;	
+END_VAR
+BEGIN
+NETWORK
+TITLE =Adressregister sichern
+
+      SET   ; 
+      TAR2  #_dwSaveAR2; 
+
+
+NETWORK
+TITLE =Formatprüfung Liste (Zusammengesetzter Datentyp)
+
+      L     P##pList; 
+      LAR1  ; 
+      L     B [AR1,P#1.0]; 
+      L     2; 
+      ==I   ; 
+      =     #_bTemp; 
+      L     W [AR1,P#2.0]; 
+      T     #_stList.iSize; 
+      L     1; 
+      >=I   ; 
+      O     #_bTemp; 
+      =     #_bTemp; 
+
+NETWORK
+TITLE =Formatprüfung Grenzwerte (Zusammengesetzter Datentyp)
+
+      L     P##pLimits; 
+      LAR2  ; 
+      L     B [AR2,P#1.0]; // Datentyp
+      L     2; 
+      ==I   ; 
+      O     #_bTemp; 
+      =     #_bTemp; // Basistyp ist "Byte"
+      L     W [AR2,P#2.0]; // Wiederholungsfaktor => Länge in Bytes
+      T     #_stLimits.iSize; 
+      L     1; 
+      >=I   ; 
+      O     #_bTemp; 
+      =     #_bTemp; // Zusammengesetzter Datentyp => Array, Struct
+      SPB   j040; 
+      L     W#16#8002; // Parameter mit ungültigem Datenformat
+      T     #RET_VAL; 
+      LAR2  #_dwSaveAR2; // Adressregister 2 wiederherstellen
+      BEA   ; 
+
+NETWORK
+TITLE =Anpassung der Variable "iSize" auf Anzahl Schleifenzyklen 
+
+j040: L     #_stList.iSize; 
+      SRW   1; // Division 2 => Länge in Word
+      L     #_stLimits.iSize; 
+      SRW   2; // Division 4 => Zwei Grenzwerte pro Listenzeile / Länge in Word
+      T     #_stLimits.iSize; // Notwendige Schleifenzyklen (Innerer Loop)
+      /I    ; 
+      T     #_stList.iSize; // Notwendige Schelifenzyklen (Äusserer Loop)
+      SRD   16; // Schiebe Akkumulator um den Modulo zu erhalten
+      L     0; 
+      ==I   ; 
+      SPB   j050; // Anzahl Limitierungen muss ein Vielfaches der Listeneinträge sein => Modulo = 0!
+      L     W#16#8004; // Parameter mit falscher Bereichslänge
+      T     #RET_VAL; 
+      LAR2  #_dwSaveAR2; 
+      BEA   ; 
+
+
+NETWORK
+TITLE =Datenbausteinnummer sichern
+
+j050: L     W [AR1,P#4.0]; // Datenbausteinnummer der Liste
+      T     #_stList.iDB; 
+      L     W [AR2,P#4.0]; // Datenbausteinnummer der Limitierung
+      T     #_stLimits.iDB; 
+
+
+NETWORK
+TITLE =Zeiger auf Daten initialisieren
+
+      L     D [AR1,P#6.0]; 
+      LAR1  ; 
+      L     D [AR2,P#6.0]; 
+      LAR2  ; 
+      TAR2  #_stLimits.dwInitAddr; // Initialadresse für Wiederherstellung sichern
+
+NETWORK
+TITLE =Durchführen der Begrenzung von Listeneinträgen
+
+      L     #_stList.iSize; 
+j070: T     #_stList.iSize; // Äusserer Loop
+      L     #_stLimits.iSize; // Innerer Loop
+j071: T     #_stLimits.iRepeat; 
+      AUF   DB [#_stLimits.iDB]; 
+      L     W [AR2,P#0.0]; 
+      T     #_stLimits.iMin; 
+      L     W [AR2,P#2.0]; 
+      T     #_stLimits.iMax; 
+      AUF   DB [#_stList.iDB]; 
+      L     W [AR1,P#0.0]; 
+      L     #_stLimits.iMin; 
+      <I    ; 
+      SPBN  j072; 
+      T     W [AR1,P#0.0]; 
+j072: TAK   ; 
+      L     #_stLimits.iMax; 
+      >I    ; 
+      SPBN  j073; 
+      T     W [AR1,P#0.0]; 
+j073: +AR2  P#4.0; 
+      +AR1  P#2.0; 
+      L     #_stLimits.iRepeat; 
+      LOOP  j071; 
+      LAR2  #_stLimits.dwInitAddr; 
+// +AR1  P#2.0
+      L     #_stList.iSize; 
+      LOOP  j070; 
+
+
+
+
+NETWORK
+TITLE =Abschluss ohne Fehler
+
+      L     0; 
+      T     #RET_VAL; 
+      LAR2  #_dwSaveAR2; 
+      BE    ; 
+
+
+END_FUNCTION
+
