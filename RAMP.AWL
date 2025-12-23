@@ -6,18 +6,18 @@ VERSION : 0.1
 
 
   STRUCT 	
-   stInput : STRUCT 	//Eingänge
-    bReset : BOOL ;	//Zurücksetzen
+   stInput : STRUCT 	//EingÃ¤nge
+    bReset : BOOL ;	//ZurÃ¼cksetzen
     iSetVal : INT ;	//Sollwert
    END_STRUCT ;	
-   stOutput : STRUCT 	//Ausgänge
+   stOutput : STRUCT 	//AusgÃ¤nge
     bAct : BOOL ;	//Rampe aktiv
     iOut : INT ;	//Ausgangswert Integerform
     rOut : REAL ;	//Ausgangswert Gleitpunktform
    END_STRUCT ;	
    stParam : STRUCT 	//Parameter
-    rVeloPos : REAL ;	//Geschwindigkeit für das "Auframpen"
-    rVeloNeg : REAL ;	//Geschwindigkeit für das "Abrampen"
+    rVeloPos : REAL ;	//Geschwindigkeit fÃ¼r das "Auframpen"
+    rVeloNeg : REAL ;	//Geschwindigkeit fÃ¼r das "Abrampen"
     rTaskTime : REAL ;	//Zykluszeit in Sekunden
    END_STRUCT ;	
   END_STRUCT ;	
